@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>help - input.js</title>
+
+	<style>
+		body {
+			font-family: sans-serif;
+			font-size: 10pt;
+			background: #cccccc;
+			padding: 0;
+			margin: 0;
+			height: 100%;
+		}
+
+		h1 {
+			margin-top: 0;
+			font-size: 3em;
+		}
+
+		h2, h3 {
+			margin-top: 2em;
+		}
+
+		h2 {font-size: 1.75em;}
+		h3 {font-size: 1.5em;}
+		h4 {font-size: 1.25em;}
+
+		table, tr, th, td {
+			text-align: left;
+			border-spacing: 0;
+		}
+
+		tr:nth-child(odd) td {
+			background: #e4e4e4;
+		}
+
+		tr td:first-child {
+			padding-right: 2em;
+		}
+
+		.page {
+			max-width: 940px;
+			background: #f2f2f2;
+			margin: 0 auto;
+		}
+
+		.content {
+			max-width: 750px;
+			padding: 1em;
+			padding-left: 190px;
+		}
+
+		.toc_container {
+			position: fixed;
+			top: 0;
+			width: 170px;
+			max-width: 170px;
+			padding: 10px;
+		}
+
+		.toc_container h4 {
+			margin: 0;
+		}
+
+		.toc, .toc ul {
+			list-style-type: none;
+			padding: 0;
+			margin: 0;
+		}
+
+		.toc ul {
+			border-left: .2em solid #bbbbbb;
+			padding-left: .8em;
+		}
+
+		.toc li {
+			line-height: 1.3;
+		}
+
+		pre {
+			display: inline-block;
+			padding: .375em .5em;
+			background: #323232;
+			color: #dddddd;
+			border-radius: .5em;
+		}
+
+		code {
+			font-family: monospace;
+			white-space: pre-wrap;
+			letter-spacing: 0.0125em;
+		}
+
+		p code {
+			font-weight: bold;
+		}
+
+		code .keyword {
+			color: #33cc66;
+		}
+
+		code .comment {
+			color: #eeaa44;
+		}
+
+		code .type {
+			color: #3333ee;
+		}
+
+		sup {
+			color: #ff0000;
+			font-weight: bold;
+		}
+
+		.indent {
+			padding-left: 4em;
+		}
+
+	</style>
+</head>
+<body>
+<div class="page">
+<div class="toc_container">
+<h4>Contents</h4>
+<ul class="toc">
+	<li><a href="#introduction">Introduction</a></li>
+	<li><a href="#getting-started">Getting started</a></li>
+	<li><a href="#a-simple-example">A simple example</a></li>
+	<li><a href="#input-devices">Input devices</a><ul>
+		<li><a href="#keyboard-components">Keyboard components</a></li>
+
+		<li><a href="#mouse">Mouse</a><ul>
+			<li><a href="#mouse-components">Mouse components</a></li>
+			<li><a href="#mouse-properties">Mouse properties</a></li>
+		</ul></li>
+		
+		<li><a href="#gamepad">Gamepad</a><ul>
+			<li><a href="#gamepad-compatibility-notes">Compatibility notes</a></li>
+			<li><a href="#gamepad-components">Gamepad components</a></li>
+			<li><a href="#gamepad-properties">Gamepad properties</a></li>
+		</ul></li>
+	</ul></li>
+	
+	<li>Using Controls<ul>
+		<li>Targets</li>
+		<li>Events</li>
+		<li>Other Control properties</li>
+	</ul></li>
+
+	<li>Using asynchronous input<ul>
+		<li>Example: mod keys</li>
+		<li>Notes on values</li>
+	</ul></li>
+</ul>
+</div>
+<div class="content">
+<h1>input.js help file!!!</h1>
+<a id="introduction"><h2>Introduction</h2></a>
+<p>input.js is a small lib designed to make in-browser game development easier by simplifying the process of detecting and responding to user input on the keyboard, mouse, and on supporting browsers, gamepads.  It works by presenting a clean and simple interface that lets you write generic input handling code without worrying about device or browser specific details.</p>
+<p>With input.js you can quickly set and change controls to manipulate objects in your game world, remap or reconfigure key and button bindings and, if you wish, easily allow your players to do the same on the fly.</p>
+
+<a id="getting-started"><h2>Getting started</h2></a>
+<p>Getting started with input.js is easy; just include these two files in your HTML document:</p>
+<pre><code>&lt;script src="utils.js"&gt;&lt;/script&gt;
+&lt;script src="input.js"&gt;&lt;/script&gt;</code></pre>
+<p>and you're ready to go!  Note that input.js depends on utils.js for stuff like high resolution timing and browser detection, and now <a href="utils_help.html">you can too!</a></p>
+
+<a id="a-simple-example"><h2>A simple example</h2></a>
+<p>Here is a simple example using input.js to detect when the spacebar is pressed, held and released:</p>
+<pre><code><span class="comment">// create a test target object for our Control</span>
+<span class="keyword">var</span> testTarget = {val:0};
+
+<span class="comment">// create a test Control</span>
+<span class="keyword">var</span> testControl = <span class="keyword">new</span> INPUT.Control({
+	target: testTarget,
+	down: <span class="keyword">function</span>(component, time) {
+		console.log(component, "pressed at", time, "ms");
+	},
+	hold: <span class="keyword">function</span>(component, duration) {
+		console.log(component, "held for", duration, "ms");
+	},
+	up: <span class="keyword">function</span>(component, duration) {
+		console.log(component, "released after", duration, "ms");
+		console.log("pressed and released", ++this.val, "times");
+	}
+});
+
+<span class="comment">// bind our test Control to the spacebar</span>
+INPUT.bind(INPUT.KEY_SPACE, testControl);
+</code></pre>
+<p>Running this code in your browser, giving focus to the page and hitting spacebar a few times will produce output like this in the console:</p>
+<pre><code>Space pressed at 477.0000000135042 ms
+Space held for 27.999999991152436 ms
+Space held for 77.9999999795109 ms
+Space held for 128.00000002607703 ms
+Space released after 149.00000003399327 ms
+pressed and released 1 times
+Space pressed at 943.0000000284053 ms
+Space held for 12.999999977182597 ms
+Space held for 62.999999965541065 ms
+Space held for 113.0000000121072 ms
+Space held for 163.00000000046566 ms
+Space released after 179.99999999301508 ms
+pressed and released 2 times</code></pre>
+<p>This is an example of using Controls, a flexible and important feature of input.js.  If your needs are simpler than this and all you need is the state of the spacebar at a given moment, input.js also exposes the asynchronous input state for your convenience:</p>
+<pre><code>console.log(INPUT.async[INPUT.KEY_SPACE]); <span class="comment">// 1 if down, undefined if up</span></code></pre>
+<p>Use whichever method you need, or mix and match as necessary.</p>
+
+<h2>Using Controls</h2>
+<p>Controls are the main feature of input.js and will do the heavy lifting for you in many game input scenarios.  As you can see in the previous section, creating a Control involves writing <code>var yourControl = new INPUT.Control(args)</code>, where <code>args</code> is an object containing one or more of the following properties.</p>
+
+<p><code>enabled: <span class="type">boolean</span>, optional</code></p>
+<p class="indent">Setting the <code>enabled</code> property at any time will determine whether or not the Control will respond to input events.  Default value is <code>true</code>.</p>
+
+<p><code>target: <span class="type">Object</span></code></p>
+<p class="indent">The object that the event callbacks are bound to.  In other words, in your callback functions, the <code>this</code> object will refer to the <code>target</code>.  You can change this property at any time.</p>
+
+<p><code>down: <span class="type">function</span>(component, time)</code></p>
+<p class="indent">A callback function that runs when a <code>press</code> event occurs on the Control.  <code>component</code> contains the <a href="#input-devices">component code</a> that triggered the event.  <code>time</code> contains the time the Control was pressed in milliseconds.</p>
+
+<p><code>hold: <span class="type">function</span>(component, duration)</code></p>
+<p class="indent">A callback function that runs when a <code>hold</code> event occurs on the Control.  <code>component</code> contains the <a href="#input-devices">component code</a> that triggered the event.  <code>duration</code> contains the elapsed time since the Control was pressed, in milliseconds.  By default, <code>hold</code> events occur when the <code>INPUT</code> object [polls].</p>
+
+<p><code>up: <span class="type">function</span>(component, duration)</code></p>
+<p class="indent">A callback function that runs when a <code>release</code> event occurs on the Control.  <code>component</code> contains the <a href="#input-devices">component code</a> that triggered the event.  <code>duration</code> contains the elapsed time since the Control was pressed, in milliseconds.</p>
+
+<p><code>move: <span class="type">function</span>(component, args)</code></p>
+<div class="indent"p>A callback function that runs when a <code>move</code> event occurs on the Control.  <code>move</code> events provide a more generic way to bind controls to changes in input and may eliminate the need for separate <code>down</code> and <code>up</code> callbacks.  <code>component</code> contains the <a href="#input-devices">component code</a> that triggered the event.  <code>args</code> is an object that by default contains the following properties:</p>
+<p><code>val</code></p>
+<p class="indent">Contains the normalized value of the move amount.  Typically this is 0 for key or button releases, 1 for key or button presses, and a decimal value between 0 and 1 for analog gamepad movements.</p>
+<p><code>d</code></p>
+<p class="indent">Contains the change in the component's value since the last move.  For keys and buttons this will be 1 for presses and -1 for releases.</p>
+<p>The following <a href="#mouse-components">mouse components</a> do not generate default <code>move</code> data:</p>
+<p><code>INPUT.MOUSE_MOVE</code></p>
+<p class="indent">Mouse move is the only component that <em>does not</em> generate the default <code>val</code> and <code>d</code> values.  Instead the <code>args</code> object contains <code>x</code> and <code>y</code> properties containing the position in pixels of the mouse cursor on the page, and <code>dx</code> and <code>dy</code> properties containing the change in position from the last mouse move event.</p>
+<p><code>INPUT.MOUSE_SCROLL_UP
+INPUT.MOUSE_SCROLL_DOWN</code></p>
+<p class="indent">Because of the differences in how different browsers handle mouse scrolling, <code>val</code> will contain a different value depending on which browser you use.  Some report the amount of <em>pixels</em> scrolled, some report the number of <em>lines</em> scrolled.  However, the <code>d</code> property will always contain -1 on a scroll up event and 1 on a scroll down.</p>
+<p>The following <a href="#gamepad-components">gamepad components</a> generate additional <code>move</code> data for your convenience:</p>
+<p><code>INPUT.DPAD_UP
+INPUT.DPAD_DOWN
+INPUT.LEFT_STICK_Y
+INPUT.RIGHT_STICK_Y</code></p>
+<p class="indent">These components return the default <code>val</code> and <code>d</code> properties, as well as <code>y</code> and <code>dy</code> properties that are convenient aliases for relative vertical movement.  Unlike <code>val</code>, which is always positive, moving the d-pad or analog sticks up will produce negative values for <code>y</code> and <code>dy</code>.  Moving the d-pad or analog sticks down will produce positive values.</p>
+<p><code>INPUT.DPAD_LEFT
+INPUT.DPAD_RIGHT
+INPUT.LEFT_STICK_X
+INPUT.RIGHT_STICK_X</code></p>
+<p class="indent">These components return the default <code>val</code> and <code>d</code> properties, as well as <code>x</code> and <code>dx</code> properties that are convenient aliases for relative horizontal movement.  Unlike <code>val</code>, which is always positive, moving the d-pad or analog sticks left will produce negative values for <code>x</code> and <code>dx</code>.  Moving the d-pad or analog sticks right will produce positive values.</p>
+</div>
+
+<a id="input-devices"><h2>Input devices</h2></a>
+<p>input.js allows you to handle input on the keyboard and mouse, and also on the gamepad (provided your browser supports the W3C Gamepad API spec and you are using a compatible gamepad; you can find more info on compatibility here).</p>
+<p>The following sections describe the different input devices and components supported by input.js in detail.</p>
+<a id="keyboard-components"><h3>Keyboard components</h3></a>
+<p>The following keyboard codes are supported by input.js:</p>
+<table>
+<tr><th>Component code</th><th>Display name</th></tr>
+<tr><td><code>INPUT.KEY_BACKSPACE</code></td><td>Backspace</td></tr>
+<tr><td><code>INPUT.KEY_TAB</code></td><td>Tab</td></tr>
+<tr><td><code>INPUT.KEY_ENTER</code></td><td>Enter</td></tr>
+<tr><td><code>INPUT.KEY_SHIFT</code></td><td>Shift</td></tr>
+<tr><td><code>INPUT.KEY_CTRL</code></td><td>Ctrl</td></tr>
+<tr><td><code>INPUT.KEY_ALT</code></td><td>Alt</td></tr>
+<tr><td><code>INPUT.KEY_PAUSE</code></td><td>Pause/Break</td></tr>
+<tr><td><code>INPUT.KEY_CAPSLOCK</code></td><td>Caps Lock</td></tr>
+<tr><td><code>INPUT.KEY_ESC</code></td><td>Esc</td></tr>
+<tr><td><code>INPUT.KEY_SPACE</code></td><td>Space</td></tr>
+<tr><td><code>INPUT.KEY_PAGEUP</code></td><td>Page Up</td></tr>
+<tr><td><code>INPUT.KEY_PAGEDOWN</code></td><td>Page Down</td></tr>
+<tr><td><code>INPUT.KEY_END</code></td><td>End</td></tr>
+<tr><td><code>INPUT.KEY_HOME</code></td><td>Home</td></tr>
+<tr><td><code>INPUT.KEY_LEFT</code></td><td>Left Arrow</td></tr>
+<tr><td><code>INPUT.KEY_UP</code></td><td>Up Arrow</td></tr>
+<tr><td><code>INPUT.KEY_RIGHT</code></td><td>Right Arrow</td></tr>
+<tr><td><code>INPUT.KEY_DOWN</code></td><td>Down Arrow</td></tr>
+<tr><td><code>INPUT.KEY_INSERT</code></td><td>Insert</td></tr>
+<tr><td><code>INPUT.KEY_DELETE</code></td><td>Delete</td></tr>
+<tr><td><code>INPUT.KEY_0</code></td><td>0</td></tr>
+<tr><td><code>INPUT.KEY_1</code></td><td>1</td></tr>
+<tr><td><code>INPUT.KEY_2</code></td><td>2</td></tr>
+<tr><td><code>INPUT.KEY_3</code></td><td>3</td></tr>
+<tr><td><code>INPUT.KEY_4</code></td><td>4</td></tr>
+<tr><td><code>INPUT.KEY_5</code></td><td>5</td></tr>
+<tr><td><code>INPUT.KEY_6</code></td><td>6</td></tr>
+<tr><td><code>INPUT.KEY_7</code></td><td>7</td></tr>
+<tr><td><code>INPUT.KEY_8</code></td><td>8</td></tr>
+<tr><td><code>INPUT.KEY_9</code></td><td>9</td></tr>
+<tr><td><code>INPUT.KEY_A</code></td><td>A</td></tr>
+<tr><td><code>INPUT.KEY_B</code></td><td>B</td></tr>
+<tr><td><code>INPUT.KEY_C</code></td><td>C</td></tr>
+<tr><td><code>INPUT.KEY_D</code></td><td>D</td></tr>
+<tr><td><code>INPUT.KEY_E</code></td><td>E</td></tr>
+<tr><td><code>INPUT.KEY_F</code></td><td>F</td></tr>
+<tr><td><code>INPUT.KEY_G</code></td><td>G</td></tr>
+<tr><td><code>INPUT.KEY_H</code></td><td>H</td></tr>
+<tr><td><code>INPUT.KEY_I</code></td><td>I</td></tr>
+<tr><td><code>INPUT.KEY_J</code></td><td>J</td></tr>
+<tr><td><code>INPUT.KEY_K</code></td><td>K</td></tr>
+<tr><td><code>INPUT.KEY_L</code></td><td>L</td></tr>
+<tr><td><code>INPUT.KEY_M</code></td><td>M</td></tr>
+<tr><td><code>INPUT.KEY_N</code></td><td>N</td></tr>
+<tr><td><code>INPUT.KEY_O</code></td><td>O</td></tr>
+<tr><td><code>INPUT.KEY_P</code></td><td>P</td></tr>
+<tr><td><code>INPUT.KEY_Q</code></td><td>Q</td></tr>
+<tr><td><code>INPUT.KEY_R</code></td><td>R</td></tr>
+<tr><td><code>INPUT.KEY_S</code></td><td>S</td></tr>
+<tr><td><code>INPUT.KEY_T</code></td><td>T</td></tr>
+<tr><td><code>INPUT.KEY_U</code></td><td>U</td></tr>
+<tr><td><code>INPUT.KEY_V</code></td><td>V</td></tr>
+<tr><td><code>INPUT.KEY_W</code></td><td>W</td></tr>
+<tr><td><code>INPUT.KEY_X</code></td><td>X</td></tr>
+<tr><td><code>INPUT.KEY_Y</code></td><td>Y</td></tr>
+<tr><td><code>INPUT.KEY_Z</code></td><td>Z</td></tr>
+<tr><td><code>INPUT.KEY_F1</code></td><td>F1</td></tr>
+<tr><td><code>INPUT.KEY_F2</code></td><td>F2</td></tr>
+<tr><td><code>INPUT.KEY_F3</code></td><td>F3</td></tr>
+<tr><td><code>INPUT.KEY_F4</code></td><td>F4</td></tr>
+<tr><td><code>INPUT.KEY_F5</code></td><td>F5</td></tr>
+<tr><td><code>INPUT.KEY_F6</code></td><td>F6</td></tr>
+<tr><td><code>INPUT.KEY_F7</code></td><td>F7</td></tr>
+<tr><td><code>INPUT.KEY_F8</code></td><td>F8</td></tr>
+<tr><td><code>INPUT.KEY_F9</code></td><td>F9</td></tr>
+<tr><td><code>INPUT.KEY_F10</code></td><td>F10</td></tr>
+<tr><td><code>INPUT.KEY_F11</code></td><td>F11</td></tr>
+<tr><td><code>INPUT.KEY_F12</code></td><td>F12</td></tr>
+<tr><td><code>INPUT.KEY_NUMLOCK</code></td><td>Num Lock</td></tr>
+<tr><td><code>INPUT.KEY_SCROLLLOCK</code></td><td>Scroll Lock</td></tr>
+<tr><td><code>INPUT.KEY_COMMA</code></td><td>,</td></tr>
+<tr><td><code>INPUT.KEY_PERIOD</code></td><td>.</td></tr>
+<tr><td><code>INPUT.KEY_SLASH</code></td><td>/</td></tr>
+<tr><td><code>INPUT.KEY_GRAVE</code></td><td>`</td></tr>
+<tr><td><code>INPUT.KEY_BRACKET_OPEN</code></td><td>[</td></tr>
+<tr><td><code>INPUT.KEY_BACKSLASH</code></td><td>\</td></tr>
+<tr><td><code>INPUT.KEY_BRACKET_CLOSE</code></td><td>]</td></tr>
+<tr><td><code>INPUT.KEY_APOSTROPHE</code></td><td>'</td></tr>
+</table>
+<p>input.js also supports the keys below, but they report different codes across browsers so if something doesn't work right with them then please [submit a bug report].</p>
+<p>A known issue is that the numpad keys don't work in Opera.  Instead they generally report as their non-numpad counterparts (exceptions include Numpad 5, which can report as the N key, and the Numpad - key, which can report as Insert).  More details can be found here: <a href="http://www.javascripter.net/faq/keycodes.htm">http://www.javascripter.net/faq/keycodes.htm</a></p>
+<table>
+<tr><th>Component code</th><th>Display name</th></tr>
+<tr><td><code>INPUT.KEY_NUMPAD_0</code></td><td>Numpad 0</td></tr>
+<tr><td><code>INPUT.KEY_NUMPAD_1</code></td><td>Numpad 1</td></tr>
+<tr><td><code>INPUT.KEY_NUMPAD_2</code></td><td>Numpad 2</td></tr>
+<tr><td><code>INPUT.KEY_NUMPAD_3</code></td><td>Numpad 3</td></tr>
+<tr><td><code>INPUT.KEY_NUMPAD_4</code></td><td>Numpad 4</td></tr>
+<tr><td><code>INPUT.KEY_NUMPAD_5</code></td><td>Numpad 5</td></tr>
+<tr><td><code>INPUT.KEY_NUMPAD_6</code></td><td>Numpad 6</td></tr>
+<tr><td><code>INPUT.KEY_NUMPAD_7</code></td><td>Numpad 7</td></tr>
+<tr><td><code>INPUT.KEY_NUMPAD_8</code></td><td>Numpad 8</td></tr>
+<tr><td><code>INPUT.KEY_NUMPAD_9</code></td><td>Numpad 9</td></tr>
+<tr><td><code>INPUT.KEY_NUMPAD_MUL</code></td><td>Numpad *</td></tr>
+<tr><td><code>INPUT.KEY_NUMPAD_ADD</code></td><td>Numpad +</td></tr>
+<tr><td><code>INPUT.KEY_NUMPAD_SUB</code></td><td>Numpad -</td></tr>
+<tr><td><code>INPUT.KEY_NUMPAD_POINT</code></td><td>Numpad .</td></tr>
+<tr><td><code>INPUT.KEY_NUMPAD_DIV</code></td><td>Numpad /</td></tr>
+<tr><td><code>INPUT.KEY_SEMICOLON</code></td><td>;</td></tr>
+<tr><td><code>INPUT.KEY_EQUALS</code></td><td>=</td></tr>
+<tr><td><code>INPUT.KEY_MINUS</code></td><td>-</td></tr>
+</table>
+<a id="mouse"><h3>Mouse</h3></a>
+<a id="mouse-properties"><h4>Mouse properties</h4></a>
+<p>In addition to binding mouse components to controls, the INPUT.Mouse object also has a few properties you can set to change the default mouse behavior:</p>
+<p><code>INPUT.Mouse.showContextMenu</code><p>
+<p class="indent">A boolean value that determines whether or not the context menu is shown when the user right clicks.  Default value is <code>false</code>.</p>
+<p><code>INPUT.Mouse.middleMouseScroll</code><p>
+<p class="indent">A boolean value that determines whether or not the scrolling "compass" appears when the user clicks the middle mouse button.  Default value is <code>false</code>.</p>
+<a id="mouse-components"><h4>Mouse components</h4></a>
+<p>The following mouse input components are supported by input.js:</p>
+<table>
+<tr><th>Component code</th><th>Display name</th></tr>
+<tr><td><code>INPUT.MOUSE_MOVE</code><sup>1</sup></td><td>Mouse Move</td></tr>
+<tr><td><code>INPUT.MOUSE_LEFT_BUTTON</code></td><td>Left Mouse Button</td></tr>
+<tr><td><code>INPUT.MOUSE_RIGHT_BUTTON</code></td><td>Right Mouse Button</td></tr>
+<tr><td><code>INPUT.MOUSE_MIDDLE_BUTTON</code></td><td>Middle Mouse Button</td></tr>
+<tr><td><code>INPUT.MOUSE_SCROLL_UP</code><sup>2</sup></td><td>Mouse Scroll Up</td></tr>
+<tr><td><code>INPUT.MOUSE_SCROLL_DOWN</code><sup>2</sup></td><td>Mouse Scroll Down</td></tr>
+</table>
+<p><sup>1</sup> The Mouse Move component only generates [move] Control events.</p>
+<p><sup>2</sup> Mouse Scroll components can't be held or released, so when the mouse wheel is scrolled, input.js generates a [press] Control event followed immediately by a [move] and [release] event to maintain consistency within user-created Controls.</p>
+<a id="gamepad"><h3>Gamepad</h3></a>
+<a id="gamepad-compatibility-notes"><h4>Gamepad compatibility notes [confirm these before release]</h4></a>
+<p>At the time of this writing (Jan 28, 2014), gamepad support in browsers is brand spanking new and browser support for the <a href="http://www.w3.org/TR/gamepad/">latest draft of the W3C Gamepad API spec</a> is spotty at best.  Currently, the spec only seems to be implemented in Google Chrome (as of version 21) and Mozilla Firefox.  Mozilla announced partial support for the Gamepad API in Firefox 24 (provided the user enables it in about:config or uses a nightly build) with full implementation planned in version 28.</p>
+<p>To complicate matters further, due to the experimental and premature nature of existing Gamepad API implementations, many gamepads that work fine in other applications are not recognized by web browsers implementing the Gamepad API spec.  You can find a list of tested compatible gamepads here: [look for one]</p>
+<p>Now that your buzz has been killed, here's how to use the gamepad with input.js!</p>
+<a id="gamepad-components"><h4>Gamepad components</h4></a>
+<p>The following gamepad input components are supported by input.js:</p>
+<table>
+<tr><th>Component code</th><th>Display name</th></tr>
+<tr><td><code>INPUT.GAMEPAD_LEFT_STICK_X</code></td><td>Left Stick X</td></tr>
+<tr><td><code>INPUT.GAMEPAD_LEFT_STICK_Y</code></td><td>Left Stick Y</td></tr>
+<tr><td><code>INPUT.GAMEPAD_RIGHT_STICK_X</code></td><td>Right Stick X</td></tr>
+<tr><td><code>INPUT.GAMEPAD_RIGHT_STICK_Y</code></td><td>Right Stick Y</td></tr>
+<tr><td><code>INPUT.GAMEPAD_BUTTON_0</code></td><td>Gamepad Button 0</td></tr>
+<tr><td><code>INPUT.GAMEPAD_BUTTON_1</code></td><td>Gamepad Button 1</td></tr>
+<tr><td><code>INPUT.GAMEPAD_BUTTON_2</code></td><td>Gamepad Button 2</td></tr>
+<tr><td><code>INPUT.GAMEPAD_BUTTON_3</code></td><td>Gamepad Button 3</td></tr>
+<tr><td><code>INPUT.GAMEPAD_LEFT_SHOULDER</code></td><td>Left Shoulder</td></tr>
+<tr><td><code>INPUT.GAMEPAD_RIGHT_SHOULDER</code></td><td>Right Shoulder</td></tr>
+<tr><td><code>INPUT.GAMEPAD_LEFT_TRIGGER</code></td><td>Left Trigger</td></tr>
+<tr><td><code>INPUT.GAMEPAD_RIGHT_TRIGGER</code></td><td>Right Trigger</td></tr>
+<tr><td><code>INPUT.GAMEPAD_SELECT</code></td><td>Select</td></tr>
+<tr><td><code>INPUT.GAMEPAD_START</code></td><td>Start</td></tr>
+<tr><td><code>INPUT.GAMEPAD_LEFT_STICK_BUTTON</code></td><td>Left Stick Button</td></tr>
+<tr><td><code>INPUT.GAMEPAD_RIGHT_STICK_BUTTON</code></td><td>Right Stick Button</td></tr>
+<tr><td><code>INPUT.GAMEPAD_DPAD_UP</code></td><td>DPad Up</td></tr>
+<tr><td><code>INPUT.GAMEPAD_DPAD_DOWN</code></td><td>DPad Down</td></tr>
+<tr><td><code>INPUT.GAMEPAD_DPAD_LEFT</code></td><td>DPad Left</td></tr>
+<tr><td><code>INPUT.GAMEPAD_DPAD_RIGHT</code></td><td>DPad Right</td></tr>
+</table>
+<p>If your gamepad supports additional buttons, you might be able to access them using component codes <code>INPUT.GAMEPAD_BUTTON_16</code> to <code>INPUT.GAMEPAD_BUTTON_31</code>.</p>
+</div>
+</div>
+</body>
+</html>

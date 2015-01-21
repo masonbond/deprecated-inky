@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="description" content="inky is a JavaScript library that simplifies detecting and responding to user input on the keyboard, mouse, and on supporting browsers, gamepads.">
+<title>inky documentation</title>
+<style>
+
+body {
+	background: #f1f1f1;
+	color: #222222;
+	width: 100%;
+	height: 100%;
+	margin: 0;
+	padding: 0;
+	font-family: sans-serif;
+	font-size: 10pt;
+}
+
+h2, h3, h4 { margin: 2em 0 1em 0;}
+h1 { margin-top: .5em; font-size: 2.5em; }
+h2 { font-size: 1.75em; }
+h3 { font-size: 1.25em; }
+h4 { font-size: 1em; }
+
+#page h2:first-child {
+	margin-top: 1em;
+}
+
+#nav h1, #nav h2 { font-weight: normal; }
+
+#nav h2 { margin-top: 1em; }
+
+#nav {
+	width: 12em;
+	height: 100%;
+	padding-left: 1em;
+	background: #323232;
+	color: #f1f1f1;
+	position: fixed;
+	left: 0;
+	top: 0;
+	overflow: auto;
+}
+
+#page {	padding: 0 1em .5em 14em; }
+
+
+#nav ul { margin: 0; padding: 0; list-style-type: none;}
+#nav ul ul { padding-left: 1.125em; border-left: .325em solid #222222; }
+#nav li { margin: .5em 0; }
+#nav li a { text-decoration: none; }
+
+/* remove these lines when docs are finished */
+#nav li {color: red;}
+#nav li a {color: #f1f1f1;}
+/* remove these lines when docs are finished */
+
+pre {
+	display: inline-block;
+	padding: .5em 1em;
+	background: #323232;
+	color: #dddddd;
+	border-radius: .5em;
+	-moz-border-radius: .5em;
+	-webkit-border-radius: .5em;
+}
+
+code {
+	overflow: visible;
+	tab-size: 4;
+	letter-spacing: .0125em;
+}
+
+p code { font-weight: bold; }
+
+code .keyword {	color: #33cc66; }
+code .comment {	color: #eeaa44; }
+code .type { color: #707070; }
+
+.indent {
+	padding-left: 4em;
+}
+
+table, tr, th, td {
+	text-align: left;
+	border-spacing: 0;
+}
+
+tr:nth-child(odd) td {
+	background: #e4e4e4;
+}
+
+tr td:first-child {
+	padding-right: 2em;
+}
+
+</style>
+</head>
+<body>
+<div id="nav">
+<h1>inky help</h1>
+<ul>
+	<li><a href="#introduction">Introduction</a></li>
+	<li><a href="#getting-started">Getting started</a></li>
+	<li><a href="#a-simple-example">A simple example</a></li>
+	<li>Controls and callbacks</li>
+	<li>Bind, unbind, rebind</li>
+	<li>Fun with binding objects</li>
+	<li>Custom move arguments</li>
+	<li>Dispatchers and the DOM</li>
+	<li>Using pointer lock</li>
+	<li>Gamepad support notes</li>
+</ul>
+
+<h2>inky reference</h2>
+<ul>
+	<li>IN object reference<ul>
+		<li>IN properties</li>
+		<li>Input component list<ul>
+			<li>Keyboard</li>
+			<li>Mouse</li>
+			<li>Gamepad</li>
+		</ul></li>
+	</ul></li>
+	<li>Dispatcher reference<ul>
+		<li>Properties</li>
+		<li>Methods</li>
+	</ul></li>
+	<li>Control reference</li>	
+</ul>
+</div>	
+<div id="page">
+
+<a id="introduction"><h2>Introduction</h2></a>
+
+<p>inky is a JavaScript library that simplifies detecting and responding to user input on the keyboard, mouse, and on supporting browsers, gamepads.  It exposes a clean and simple interface that lets you write generic input handling code without dealing with device or browser specific details.</p>
+
+<p>With inky you can quickly set and change controls to manipulate objects, map and re-map key and button bindings and, if you wish, easily allow your users to do the same during runtime.</p>
+
+
+<a id="getting-started"><h2>Getting started</h2></a>
+
+<p>To use inky, include these two files in your HTML document:</p>
+
+<pre><code>&lt;script src="utils.js"&gt;&lt;/script&gt;
+&lt;script src="inky.js"&gt;&lt;/script&gt;</code></pre>
+
+<p>inky depends on utils.js for stuff like high resolution timing and browser detection, and now <a href="utils_help.html">you can too</a>!</p>
+
+
+<a id="a-simple-example"><h2>A simple example</h2></a>
+<p>Here is a simple script that detects when the spacebar is pressed, held and released:</p>
+<pre><code><span class="comment">// create a test object for the Control to manipulate</span>
+<span class="keyword">var</span> testTarget = {timesPressed:0};
+
+<span class="comment">// create a Dispatcher to watch for and raise input events</span>
+<span class="keyword">var</span> dispatcher = <span class="keyword">new</span> IN.Dispatcher();
+
+<span class="comment">// create a test Control</span>
+<span class="keyword">var</span> testControl = <span class="keyword">new</span> IN.Control({
+	press: <span class="keyword">function</span>(e) {
+		console.log(e.component, "pressed at", e.time, "ms");
+	},
+	hold: <span class="keyword">function</span>(e) {
+		console.log(e.component, "held for", e.duration, "ms");
+	},
+	release: <span class="keyword">function</span>(e) {
+		console.log(e.component, "released after", e.duration, "ms");
+		console.log("pressed and released", ++this.target.timesPressed, "times");
+	}
+});
+
+<span class="comment">// use the Dispatcher to bind the test Control to the spacebar</span>
+dispatcher.bind({
+	control: testControl,
+	component: IN.KEY_SPACE,
+	target: testTarget
+});
+</code></pre>
+<p>Running this code in your browser, giving focus to the page and hitting spacebar will produce output like this in the console:</p>
+<pre><code>Space pressed at 477.0000000135042 ms
+Space held for 27.999999991152436 ms
+Space held for 77.9999999795109 ms
+Space held for 128.00000002607703 ms
+Space released after 149.00000003399327 ms
+pressed and released 1 times
+Space pressed at 943.0000000284053 ms
+Space held for 12.999999977182597 ms
+Space held for 62.999999965541065 ms
+Space held for 113.0000000121072 ms
+Space held for 163.00000000046566 ms
+Space released after 179.99999999301508 ms
+pressed and released 2 times</code></pre>
+<p>This is an example of using Controls, a flexible and important feature of inky.  If all you need is the state of the spacebar at a given moment, inky also exposes the asynchronous input state:</p>
+<pre><code>console.log(IN.async[IN.KEY_SPACE]); <span class="comment">// 1 if down, undefined if up</span></code></pre>
+<p>You still need to create a <code>Dispatcher</code> object in order to use <code>IN.async</code>, even if you don't use any Controls.</p>
+
+<h2><a id="controls-and-callbacks">Controls and callbacks</a></h2>
+Think of a <code>Control</code> as collection of callbacks that react to changes in the state of an input component.  Which component isn't important; keyboard key, gamepad stick or mouse wheel, a <code>Control</code> will let you handle them predictably and interchangeably.</p>
+<p>Here's a basic rundown of the anatomy of a <code>Control</code>:</p>
+<pre><code><span class="keyword">var</span> c = <span class="keyword">new</span> IN.Control({
+	press: <span class="keyword">function</span>(e) {
+		<span class="comment">// called when a component is pressed</span>
+
+		<span class="comment">// e is an event object that always has the</span>
+		<span class="comment">// following properties:</span>
+
+		e.type;      <span class="comment">// in this case IN.PRESS</span>
+
+		e.time;      <span class="comment">// the time of the event, in milliseconds</span>
+		
+		e.device;    <span class="comment">// <a href="#">device code</a> that raised this event,</span>
+		             <span class="comment">// such as IN.GAMEPAD_1</span>
+		
+		e.component; <span class="comment">// <a href="#">component code</a> that raised this event,</span>
+		             <span class="comment">// such as IN.GAMEPAD_BUTTON_0</span>
+		
+		e.binding;   <span class="comment">// a <a href="#">binding object</a> that exposes all kinds</span>
+		             <span class="comment">// of mutable properties about the bound</span>
+		             <span class="comment">// Control, for complex input behaviors</span>
+
+		<span class="comment">// press event objcets have no additional properties.</span>
+	},
+	hold: <span class="keyword">function</span>(e) {
+		<span class="comment">// called at intervals when the component is held down</span>
+		
+		<span class="comment">// the interval is determined by the pollRate property</span>
+		<span class="comment">// of the Dispatcher object that has bound this Control.</span>
+
+		<span class="comment">// hold event objects have an additional property:</span>
+
+		e.duration; <span class="comment">// ms elapsed since the press event</span>
+	},
+	release: <span class="keyword">function</span>(e) {
+		<span class="comment">// called when the component is released</span>
+
+		<span class="comment">// release event objects also have a duration property:</span>
+
+		e.duration; <span class="comment">// ms elapsed since the press event</span>
+	},
+	move: <span class="keyword">function</span>(e) {
+		<span class="comment">// this is a more generic event that is called when</span>
+		<span class="comment">// a component is pressed, released or otherwise moved.</span>
+
+		<span class="comment">// move event objects have a very special property:</span>
+
+		e.move; <span class="comment">// a <a href="#">move arguments</a> object that contains</span>
+		        <span class="comment">// somewhat <a href="#">customizable</a> position/move data</span>
+		        <span class="comment">// about the event.</span>
+	}
+});</code></pre>
+<h2>Dispatcher object reference</h2>
+<p>A <code>Dispatcher</code> is what inky uses to detect changes in the input state and route input events to the appropriate <code>Control</code>.  At least one is required to get anything useful out of inky.  Some applications can benefit from having more than one, such as when you'd like to group sets of Controls together, or update different Controls at different rates.</p>
+
+<h3>Dispatcher properties</h3>
+<p>When you create a <code>Dispatcher</code>, you can optionally pass it an object of arguments.  The following properties are currently supported:</p>
+
+<p><code>enabled : <span class="type">Boolean</span></code></p>
+<p class="indent">Determines whether or not the <code>Dispatcher</code> is currently responding to input.  Default value is <code>true</code>.</p>
+<p><code>autoPoll : <span class="type">Boolean</span></code></p>
+<p class="indent">Determines whether or not the <code>Dispatcher</code> will poll automatically, at an interval determined by the <code>pollRate</code> property.  If set to <code>false</code>, you will have to periodically call the <code>poll</code> method of the <code>Dispatcher</code> to properly raise events.  Default value is <code>true</code>.</p>
+<p><code>pollRate : <span class="type">Number</span></code></p>
+<p class="indent">An integer value representing the rate in milliseconds at which the <code>Dispatcher</code> will automatically poll itself, if <code>autoPoll</code> is <code>true</code>.  Polling is required for a <code>Dispatcher</code> to raise <code>hold</code> events from the keyboard and mouse, and to raise any input events for gamepads.  Default value is <code>50</code>.</p>
+<p><code>analogDeadZone : <span class="type">Number</span></code></p>
+<p class="indent">A floating point value in the <code>0..1</code> range that determines how far an analog gamepad component must be moved before it will raise <code>move</code> events on this <code>Dispatcher</code>.  Crossing the <code>analogDeadZone</code> will also raise appropriate <code>press</code> and <code>release</code> events for that component.  Component movements that happen within the <code>0..analogDeadZone</code> range will be ignored.  Default value is <code>.2</code>.</p>
+<p class="indent">Note that the values that are passed to your <code>Control</code>'s <code>move</code> callbacks are normalized back into the <code>0..1</code> range.  For example, if you set <code>analogDeadZone</code> to <code>.5</code> and move an analog stick such that the raw input value is <code>.625</code>, the value passed to the <code>move</code> callback will be <code>.25</code> since <code>.625</code> is one quarter of the way between <code>.5</code> and <code>1</code>.  This is to allow precise controls even with high <code>analogDeadZone</code> values brought on by wiggly analog sticks and such.</p>
+<p><code>analogThreshold : <span class="type">Number</span></code></p>
+<p class="indent">A floating point value in the <code>0..1</code> range that determines how far an analog component must be moved from the last <code>move</code> event value before a new <code>move</code> event is raised.  The <code>analogThreshold</code> value is based on the raw input value, before the <code>analogDeadZone</code> is taken into account. Default value is <code>.01</code>.</p>
+<p><code>allowContextMenu : <span class="type">Boolean</span></code></p>
+<p class="indent">Determines whether or not the context menu will appear in this <code>Dispatcher</code>'s element after the right mouse button or context menu button is pressed.  Defaults to <code>false</code>.</p>
+<p><code>allowMiddleMouseScroll : <span class="type">Boolean</span></code></p>
+<p class="indent">Determines whether or not the mouse scrolling "compass" will appear when the middle mouse button is clicked inside this <code>Dispatcher</code>'s element.  Default value is <code>false</code>.</p>
+<p><code>allowSelect : <span class="type">Boolean</span></code></p>
+<p class="indent">Determines whether or not selections can be made within this <code>Dispatcher</code>'s element.  Default value is <code>false</code>.</p>
+<p><code>allowDrag : <span class="type">Boolean</span></code></p>
+<p class="indent">Determines whether or not dragging is allowed within this <code>Dispatcher</code>'s element.  Default value is <code>false</code>.</p>
+
+<p>Even after the <code>Dispatcher</code> object has been constructed, you can still change these properties during runtime and the object's behavior will change accordingly.  For example:</p>
+
+<pre><code><span class="keyword">var</span> d = <span class="keyword">new</span> IN.Dispatcher({
+	pollRate: 50
+});
+
+<span class="comment">// later on...</span>
+
+d.pollRate = 100; <span class="comment">// d will now poll 10 times per second instead of 20</span>
+
+<span class="comment">// later still...</span>
+
+d.enabled = false; <span class="comment">// d is now disabled</span></code></pre>
+
+<h3>Dispatcher methods</h3>
+<p>You can also call the following methods to interact with a dispatcher:</p>
+
+<h4>Going deeper</h4>
+<p>This is some detailed information right here</p>
+</div>
+</body>
+</html>
