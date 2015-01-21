@@ -229,7 +229,7 @@ var pi = {
 		var listeners = {};
 		var oldPollRate = args && (args.pollRate !== undefined) ? args.pollRate : defaults.pollRate;
 		var pollInterval = setInterval(autoPoll, oldPollRate);
-		var pads = {};
+		var pads = [];
 		var oldMX = undefined, oldMY = undefined;
 
 		var rebindTarget = {
@@ -277,13 +277,12 @@ var pi = {
 			if (!getGamepads) return;
 
 			var newPads = navigator[getGamepads]();
-
 			var refreshPads = false;
 
 			for (var i = 0; i < maxPads; ++i) {
-				if ((!!newPads[i] !== !!pads[i]) || (newPads[i] && pads[i] && pads[i].id !== newPads[i].id)) {
+				if ((!!newPads[i] !== !!pads[i]) 
+					|| (newPads[i] && pads[i] && pads[i].id !== newPads[i].id)) {
 					refreshPads = true;
-					console.log("refresh");
 					break;
 				}
 			}
@@ -291,15 +290,14 @@ var pi = {
 			if (refreshPads) {
 				// gotta copy individual values instead of object refs
 				for (var i = 0; i < maxPads; ++i) {
-					console.log('new pad', newPads);
 					var cur = newPads[i];
 					if (cur) {
 						var old = pads[i] = {id:cur.id, timestamp:cur.timestamp, axes:[], buttons:[]};
-						for (var j = 0; j < maxAxes; ++j) {
+						for (var j = 0; cur.axes[j] !== undefined && j < maxAxes; ++j) {
 							old.axes[j] = cur.axes[j];
 						}
-						for (var j = 0; j < maxButtons; ++j) {
-							old.buttons[j] = cur.buttons[j];
+						for (var j = 0; cur.buttons[j] !== undefined && j < maxButtons; ++j) {
+							old.buttons[j] = cur.buttons[j].value;
 						}
 					} else {
 						pads[i] = undefined;
@@ -313,7 +311,7 @@ var pi = {
 				var cur = newPads[i];
 				var old = pads[i];
 
-				if (!cur || cur.timestamp === old.timestamp) continue;
+				if (!cur || (cur.timestamp !== undefined && cur.timestamp === old.timestamp)) continue;
 
 				var curAxes = [], oldAxes = [], curButtons = [], oldButtons = [];
 
@@ -327,14 +325,9 @@ var pi = {
 		function raiseComponentEvents(curList, oldList, codes, deviceIndex) {
 			for (var i = 0, l = curList.length; i < l; ++i) {
 				var code = codes[i];
-				var cur = curList[i];
+				var cur = curList[i].value === undefined ? curList[i] : curList[i].value;
+				var curRaw = cur;  // before dead zone transformation
 				var old = oldList[i];
-
-				cur = cur && cur.value || cur;
-				old = old && old.value || old;
-
-				//if (code === pi.GAMEPAD_BUTTON_0) console.log(old, cur);
-
 				var diff = cur - old;
 
 				if (Math.abs(diff) >= result.analogThreshold) {
@@ -342,7 +335,7 @@ var pi = {
 
 					if (Math.abs(cur) >= result.analogDeadZone) {
 						cur = (cur > 0 ? (cur - result.analogDeadZone) : (cur + result.analogDeadZone)) / (1 - result.analogDeadZone);
-						pi.async[code] = cur;
+						pi.async[padIndexComponent] = cur;
 
 						if (Math.abs(old) < result.analogDeadZone && isFocused()) {
 							result.press(code);
@@ -353,10 +346,10 @@ var pi = {
 						result.move(code, {v:cur,dv:cur-old});
 						result.move(padIndexComponent, {v:cur,dv:cur-old});
 					} else {
-						delete pi.async[code];
+						cur = pi.async[padIndexComponent] = 0;
 
-						if (Math.abs(old) >= result.analogDeadZone) {
-							old = (old > 0 ? (old - result.analogDeadZone) : (old + result.analogDeadZone)) / (1 - result.analogDeadZone);
+						if (Math.abs(old) > 0) {
+							old = ((old > 0 && old - result.analogDeadZone) || (old < 0 && old + result.analogDeadZone) || 0) / (1 - result.analogDeadZone);
 							result.move(code, {v:0,dv:-old});
 							result.move(padIndexComponent, {v:0,dv:-old});
 							result.release(code);
@@ -364,7 +357,7 @@ var pi = {
 						}
 					}
 
-					oldList[i] = curList[i];
+					oldList[i] = curUnscaled;
 				}
 			}
 		}

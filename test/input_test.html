@@ -63,7 +63,7 @@ var c2 = new IN.Control({
 		console.log(e);
 	},
 	move: function(e){
-		//console.log("2 MVOE!!!!!!!!!");
+		console.log("2 MVOE!!!!!!!!!", e.move);
 	}
 });
 
@@ -85,7 +85,7 @@ var binding2 = input2.bind({
 	control: c2,
 	target: t2,
 	moveArgs: {x: -1},  
-	component: [IN.KEY_SPACE, IN.GAMEPAD_BUTTON_0, IN.GAMEPAD_0_BUTTON_0, IN.GAMEPAD_LEFT_TRIGGER, IN.MOUSE_LEFT_BUTTON, IN.GAMEPAD_LEFT_STICK_X]
+	component: [IN.KEY_SPACE, IN.GAMEPAD_0_BUTTON_0, IN.GAMEPAD_LEFT_TRIGGER, IN.MOUSE_LEFT_BUTTON, IN.GAMEPAD_LEFT_STICK_X]
 });//*/
      
 console.log("binding2", binding2, c);
