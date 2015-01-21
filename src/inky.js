@@ -357,7 +357,7 @@ var pi = {
 						}
 					}
 
-					oldList[i] = curUnscaled;
+					oldList[i] = curRaw;
 				}
 			}
 		}
