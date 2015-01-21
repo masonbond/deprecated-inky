@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script src="../src/utils.js"></script>
+<script src="../src/inky.js"></script>
+<style>
+body {
+	background: #323232;
+	color: #dddddd;
+	font-family: sans-serif;
+	font-size: 11pt;
+}
+
+.test {
+	width: 300px;
+	height: 300px;
+	background: black;
+}
+
+#tsest {
+	position: absolute;
+	left: 100px;
+	top: 100px;
+	background: red;
+}
+
+</style>
+</head>
+<body>
+input test
+<div id="test" class="test">asdf</div>g<div id="test2" class="test">d</div>
+<input type="text" id="text1"><input type="text" id="text2">
+<script>
+console.log(IN.version);
+console.log(IN);
+
+var testElement = document.getElementById("test");
+var testElement2 = document.getElementById("test2");
+
+var input = new IN.Dispatcher({
+	element: testElement,
+	pollRate: 50
+});
+
+var input2 = new IN.Dispatcher({
+	element: testElement2,
+	pollRate: 40, 
+	allowDefaultKeyboardEvents: true,
+	allowFocusOnHover: true
+});
+
+var t2 = {val:0,times:[]};
+
+var c2 = new IN.Control({
+	press: function(e){
+		console.log("2 press");
+	},
+	hold: function(e){
+		console.log("2 hold");
+	},
+	release: function(e){
+		console.log("2- pressed and released", ++this.target.val, "times");
+		console.log(e);
+	},
+	move: function(e){
+		//console.log("2 MVOE!!!!!!!!!");
+	}
+});
+
+var c = new IN.Control({
+	move: function(e){
+		//console.log("1", e, "moved by", e.data);
+	}
+});
+
+var binding = input.bind({
+	control: c,
+	moveArgs: {butt: 1},
+	component: [IN.KEY_SPACE, IN.MOUSE_LEFT_BUTTON, IN.MOUSE_MOVE, IN.GAMEPAD_LEFT_STICK_X]
+});
+
+console.log("binding", binding);
+
+var binding2 = input2.bind({
+	control: c2,
+	target: t2,
+	moveArgs: {x: -1},  
+	component: [IN.KEY_SPACE, IN.GAMEPAD_BUTTON_0, IN.GAMEPAD_0_BUTTON_0, IN.GAMEPAD_LEFT_TRIGGER, IN.MOUSE_LEFT_BUTTON, IN.GAMEPAD_LEFT_STICK_X]
+});//*/
+     
+console.log("binding2", binding2, c);
+
+setTimeout(function(){
+	binding.moveArgs = {poop: 1};
+}, 5000);
+
+
+testElement.addEventListener("click", function(e) {
+	input.requestPointerLock(function(e) {
+		console.log("entering pointurd lock");
+		setTimeout(function(){
+			input.exitPointerLock(function(e) {
+				console.log("exiting pointer lock - this callback set at time of exit request");
+			});
+		}, 5000);
+	},
+	function(e) {
+		console.log("exiting pointer lock - this callback set at time of lock request");
+	});
+
+});
+//*/
+//setInterval(function(){console.log(IN.async);},1000);
+
+</script>
+</body>
+</html>
