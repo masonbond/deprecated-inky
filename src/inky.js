@@ -579,8 +579,6 @@ var pi = {
 				modifyListeners(removeListener, listeners, args.component, {control: args.control}, args.prepend);
 			},
 			rebind: function(args) {
-				// TODO complete this using the new super cool binding objects
-				// TODO find out what the fuck i meant by the above
 				if (rebindTarget.control !== undefined || !args.control) return false;
 
 				rebindTarget.control = args.control;
@@ -610,9 +608,7 @@ var pi = {
 					addDOMListeners();
 				}
 
-				if (!result.enabled) return; // RFI is this the way to go?
-				// should i instead enter hold event block if result.enabled and check enabled in pollGamepads as well?
-				// i'm thinking i should still update cur and old states for gamepads when the dispatcher is disabled
+				if (!result.enabled) return;
 
 				// raise hold events on active components
 				for (var component in pi.async) {
