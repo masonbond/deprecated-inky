@@ -212,7 +212,7 @@ document.addEventListener("webkitpointerlockerror", pointerLockError);
 
 // create public interface
 var pi = {
-	version: "inky.js 0.9 alpha",
+	version: "0.8",
 	async: {},
 	Mouse: {
 		position: {x: undefined, y: undefined},
