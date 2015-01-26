@@ -683,8 +683,8 @@ var pi = {
 			deadZone: args && (args.deadZone !== undefined) ? args.deadZone : defaults.touchDeadZone,
 			threshold: args && (args.threshold !== undefined) ? args.threshold : defaults.touchThreshold,
 			DEVICE: deviceCode,
-			COORD_X: deviceCode + ' Slider X',
-			COORD_Y: deviceCode + ' Slider Y',
+			COORD_X: deviceCode + ' Coord X',
+			COORD_Y: deviceCode + ' Coord Y',
 			RADIAL_X: deviceCode + ' Radial X',
 			RADIAL_Y: deviceCode + ' Radial Y',
 			PRESSURE: deviceCode + ' Pressure'
@@ -695,28 +695,31 @@ var pi = {
 		function touchHandler(e) {
 			var rect = element.getBoundingClientRect();
 			var width = rect.right - rect.left;
-			var height = rect.top - rect.bottom;
+			var height = rect.bottom - rect.top;
 			var xCenter = (rect.left + rect.right) / 2;
 			var yCenter = (rect.top + rect.bottom) / 2;
 
 			// TODO for (var i = 0, touch; touch = e.changedTouches[i]; ++i) if (touch.target === element) {
-			var touch = touches[touches.length - 1];
+			var touch = e.changedTouches[e.changedTouches.length - 1];
 
 			var x = (touch.pageX - rect.left) / width;
 			var y = (touch.pageY - rect.top) / height;
 
 			newValues.PRESSURE = touch.force;
-			newValues.COORD_X = x;
-			newValues.COORD_Y = y;
-			newValues.RADIAL_X = x + x - 0.5;
-			newValues.RADIAL_Y = y + y - 0.5;
+			newValues.COORD_X = Math.min(1, x);
+			newValues.COORD_Y = Math.min(1, y);
 
-			// normalize x and y to make a circular "stick" area
-			var d = Math.sqrt(newValues.RADIAL_X * newValues.RADIAL_X + newValues.RADIAL_Y * newValues.RADIAL_Y);
-			var scale = Math.max(Math.abs(newValues.RADIAL_X) / d, Math.abs(newValues.RADIAL_Y) / d);
-			
-			newValues.RADIAL_X = Math.min(1, newValues.RADIAL_X / scale);
-			newValues.RADIAL_Y = Math.min(1, newValues.RADIAL_Y / scale);
+			var rx = x + x - 1;
+			var ry = y + y - 1;
+
+			// maximum vector length (from center) of 1
+			var d = Math.sqrt(rx * rx + ry * ry);
+			d = Math.min(1, d) / d;
+
+			newValues.RADIAL_X = rx * d;
+			newValues.RADIAL_Y = ry * d;
+
+			// TODO deadZone behavior update for COORD_X and COORD_Y
 
 			for (var component in newValues) {
 				var old = oldValues[component];
@@ -727,13 +730,17 @@ var pi = {
 				if (Math.abs(diff) >= result.threshold) {
 					pi.async[componentCode] = cur;
 
-					if (Math.abs(cur) >= analogDeadZone) {
-						if (Math.abs(old) < analogDeadZone) pi.press(componentCode);
+					if (Math.abs(cur) >= result.deadZone) {
+						if (Math.abs(old) < result.deadZone) pi.press(componentCode);
+						pi.move(componentCode, {v: cur, dv: diff});
 					} else {
 						cur = 0;
 						diff = -old;
-						
-						if (Math.abs(old) >= analogDeadZone) pi.release(componentCode);
+
+						if (Math.abs(old) >= result.deadZone) {
+							pi.move(componentCode, {v: cur, dv: diff});
+							pi.release(componentCode);
+						}
 					}
 
 					oldValues[component] = cur;

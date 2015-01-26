@@ -37,6 +37,7 @@ console.log(IN);
 
 var testElement = document.getElementById("test");
 var testElement2 = document.getElementById("test2");
+var smearElement = document.getElementById('smear');
 
 var input = new IN.Dispatcher({
 	element: testElement,
@@ -51,7 +52,7 @@ var input2 = new IN.Dispatcher({
 });
 
 var smear = new IN.TouchArea({
-	element: document.getElementById("smear")
+	element: smearElement
 });
 
 console.log("smear", smear);
@@ -77,13 +78,15 @@ var c2 = new IN.Control({
 var c = new IN.Control({
 	move: function(e){
 		//console.log("1", e, "moved by", e.data);
+
+		smearElement.innerHTML = "move " + e.component + ": " + e.move.v;
 	}
 });
 
 var binding = input.bind({
 	control: c,
 	moveArgs: {butt: 1},
-	component: [IN.KEY_SPACE, IN.MOUSE_LEFT_BUTTON, IN.MOUSE_MOVE, IN.GAMEPAD_LEFT_STICK_X]
+	component: [IN.KEY_SPACE, IN.MOUSE_LEFT_BUTTON, IN.MOUSE_MOVE, IN.GAMEPAD_LEFT_STICK_X, smear.RADIAL_X]
 });
 
 console.log("binding", binding);
