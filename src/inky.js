@@ -23,9 +23,6 @@ var defaults = {
 
 // helpers
 
-// TODO FIRST
-//		software touchscreen controls
-
 function indexOfListener(obj, component, control) {
 	for (var i = 0, l = obj[component].length; i < l; ++i) {
 		if (obj[component][i].control === control) return i;
@@ -728,7 +725,7 @@ var pi = {
 			// TODO FIRST scale deadZone properly for radial input; right now it's manhattan
 			// TODO NEXT have manhattan/euclidean scalings for gamepad analogs?
 			// TODO deadZone behavior update for COORD_X and COORD_Y
-			// TODO snapping behavior
+			// TODO snapping behavior, at least for 'sticks'
 			// touchstart, touchleave, touchcancel differentiation
 
 			for (var component in newValues) {
@@ -782,7 +779,6 @@ var components = {
 
 	KEYBOARD: "Keyboard",
 	MOUSE: "Mouse",
-	TOUCH: "Touch",
 	GAMEPAD: "Gamepad",
 	GAMEPAD_0: "Gamepad 0",
 	GAMEPAD_1: "Gamepad 1",
