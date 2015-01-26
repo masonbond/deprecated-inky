@@ -28,8 +28,9 @@ body {
 </head>
 <body>
 input test
-<div id="test" class="test">asdf</div>g<div id="test2" class="test">d</div>
+<div id="test" class="test">asdf</div>g<div id="test2" class="test">d</div>buns<div id="smear" class="test"></div>
 <input type="text" id="text1"><input type="text" id="text2">
+
 <script>
 console.log(IN.version);
 console.log(IN);
@@ -48,6 +49,12 @@ var input2 = new IN.Dispatcher({
 	allowDefaultKeyboardEvents: true,
 	allowFocusOnHover: true
 });
+
+var smear = new IN.TouchArea({
+	element: document.getElementById("smear")
+});
+
+console.log("smear", smear);
 
 var t2 = {val:0,times:[]};
 

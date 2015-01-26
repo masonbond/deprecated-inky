@@ -6,6 +6,7 @@ var defaults = {
 	autoPoll: true,
 	dispatcherEnabled: true,
 	controlEnabled: true,
+	touchAreaEnabled: true,
 	allowContextMenu: false,
 	allowMiddleMouseScroll: false,
 	allowSelect: false,
@@ -13,7 +14,9 @@ var defaults = {
 	allowFocusOnHover: true,
 	allowDefaultKeyboardEvents: false,
 	analogDeadZone: .2,
-	analogThreshold: .01
+	analogThreshold: .01,
+	touchDeadZone: .2,
+	touchThreshold: .01
 };
 
 // static privates
@@ -210,10 +213,30 @@ document.addEventListener("pointerlockerror", pointerLockError);
 document.addEventListener("mozpointerlockerror", pointerLockError);
 document.addEventListener("webkitpointerlockerror", pointerLockError);
 
+// touch component stuff
+
+var touchAreaId = 0;
+
+// dispatcher list for custom components
+
+var dispatchers = [];
+
 // create public interface
 var pi = {
 	version: "0.8",
 	async: {},
+	press: function(component, time) {
+		for (var i = 0, dispatcher; dispatcher = dispatchers[i]; ++i) dispatcher.press(component, time);
+	},
+	hold: function(component, duration, time) {
+		for (var i = 0, dispatcher; dispatcher = dispatchers[i]; ++i) dispatcher.hold(component, duration, time);
+	},
+	release: function(component, duration, time) {
+		for (var i = 0, dispatcher; dispatcher = dispatchers[i]; ++i) dispatcher.release(component, duration, time);
+	},
+	move: function(component, args, time) {
+		for (var i = 0, dispatcher; dispatcher = dispatchers[i]; ++i) dispatcher.move(component, args, time);
+	},
 	Mouse: {
 		position: {x: undefined, y: undefined},
 		exitPointerLock: function(onExit) {
@@ -619,6 +642,7 @@ var pi = {
 			}
 		};
 
+		dispatchers.push(result);
 		return result;
 	},
 	Control: function(args) {
@@ -630,23 +654,103 @@ var pi = {
 			release: args.release
 		};
 	},
-};
+	TouchArea: function(args) {
+		var element = args && args.element;
 
-var events = {
-	PRESS: "Press",
-	RELEASE: "Release",
-	HOLD: "Hold",
-	MOVE: "Move"
-};
+		if (!(element && element.nodeType)) {
+			// TODO error, not valid DOM element
+			return false;
+		}
 
-var devices = {
-	KEYBOARD: "Keyboard",
-	MOUSE: "Mouse",
-	GAMEPAD_0: "Gamepad 0",
-	GAMEPAD_1: "Gamepad 1",
-	GAMEPAD_2: "Gamepad 2",
-	GAMEPAD_3: "Gamepad 3"
-}
+		var deviceCode = 'Touch Area' + (args && (args.name !== undefined) ? (': ' + args.name) : (' ' + touchAreaId));
+		var oldValues = {
+			COORD_X: 0,
+			COORD_Y: 0,
+			RADIAL_X: 0,
+			RADIAL_Y: 0,
+			PRESSURE: 0
+		};
+		var newValues = {
+			COORD_X: 0,
+			COORD_Y: 0,
+			RADIAL_X: 0,
+			RADIAL_Y: 0,
+			PRESSURE: 0
+		};
+		var result = {
+			id: touchAreaId,
+			enabled: args && (args.enabled !== undefined) ? args.enabled : defaults.touchAreaEnabled,
+			deadZone: args && (args.deadZone !== undefined) ? args.deadZone : defaults.touchDeadZone,
+			threshold: args && (args.threshold !== undefined) ? args.threshold : defaults.touchThreshold,
+			DEVICE: deviceCode,
+			COORD_X: deviceCode + ' Slider X',
+			COORD_Y: deviceCode + ' Slider Y',
+			RADIAL_X: deviceCode + ' Radial X',
+			RADIAL_Y: deviceCode + ' Radial Y',
+			PRESSURE: deviceCode + ' Pressure'
+		};
+
+		++touchAreaId;
+
+		function touchHandler(e) {
+			var rect = element.getBoundingClientRect();
+			var width = rect.right - rect.left;
+			var height = rect.top - rect.bottom;
+			var xCenter = (rect.left + rect.right) / 2;
+			var yCenter = (rect.top + rect.bottom) / 2;
+
+			// TODO for (var i = 0, touch; touch = e.changedTouches[i]; ++i) if (touch.target === element) {
+			var touch = touches[touches.length - 1];
+
+			var x = (touch.pageX - rect.left) / width;
+			var y = (touch.pageY - rect.top) / height;
+
+			newValues.PRESSURE = touch.force;
+			newValues.COORD_X = x;
+			newValues.COORD_Y = y;
+			newValues.RADIAL_X = x + x - 0.5;
+			newValues.RADIAL_Y = y + y - 0.5;
+
+			// normalize x and y to make a circular "stick" area
+			var d = Math.sqrt(newValues.RADIAL_X * newValues.RADIAL_X + newValues.RADIAL_Y * newValues.RADIAL_Y);
+			var scale = Math.max(Math.abs(newValues.RADIAL_X) / d, Math.abs(newValues.RADIAL_Y) / d);
+			
+			newValues.RADIAL_X = Math.min(1, newValues.RADIAL_X / scale);
+			newValues.RADIAL_Y = Math.min(1, newValues.RADIAL_Y / scale);
+
+			for (var component in newValues) {
+				var old = oldValues[component];
+				var cur = newValues[component];
+				var diff = cur - old;
+				var componentCode = result[component];
+
+				if (Math.abs(diff) >= result.threshold) {
+					pi.async[componentCode] = cur;
+
+					if (Math.abs(cur) >= analogDeadZone) {
+						if (Math.abs(old) < analogDeadZone) pi.press(componentCode);
+					} else {
+						cur = 0;
+						diff = -old;
+						
+						if (Math.abs(old) >= analogDeadZone) pi.release(componentCode);
+					}
+
+					oldValues[component] = cur;
+				}
+			}
+			//}
+		}
+
+		element.addEventListener("touchstart", touchHandler, false);
+		element.addEventListener("touchmove", touchHandler, false);
+		element.addEventListener("touchend", touchHandler, false);
+		element.addEventListener("touchleave", touchHandler, false);
+		element.addEventListener("touchcancel", touchHandler, false);
+
+		return result;
+	}
+};
 
 // input devices and components
 var components = {
@@ -661,6 +765,7 @@ var components = {
 
 	KEYBOARD: "Keyboard",
 	MOUSE: "Mouse",
+	TOUCH: "Touch",
 	GAMEPAD: "Gamepad",
 	GAMEPAD_0: "Gamepad 0",
 	GAMEPAD_1: "Gamepad 1",
