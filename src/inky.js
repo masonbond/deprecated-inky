@@ -666,6 +666,8 @@ var pi = {
 		var oldValues = {
 			COORD_X: 0,
 			COORD_Y: 0,
+			MANHATTAN_X: 0,
+			MANHATTAN_Y: 0,
 			RADIAL_X: 0,
 			RADIAL_Y: 0,
 			PRESSURE: 0
@@ -673,6 +675,8 @@ var pi = {
 		var newValues = {
 			COORD_X: 0,
 			COORD_Y: 0,
+			MANHATTAN_X: 0,
+			MANHATTAN_Y: 0,
 			RADIAL_X: 0,
 			RADIAL_Y: 0,
 			PRESSURE: 0
@@ -685,6 +689,8 @@ var pi = {
 			DEVICE: deviceCode,
 			COORD_X: deviceCode + ' Coord X',
 			COORD_Y: deviceCode + ' Coord Y',
+			MANHATTAN_X: deviceCode + ' Manhattan X',
+			MANHATTAN_Y: deviceCode + ' Manhattan Y',
 			RADIAL_X: deviceCode + ' Radial X',
 			RADIAL_Y: deviceCode + ' Radial Y',
 			PRESSURE: deviceCode + ' Pressure'
@@ -709,8 +715,8 @@ var pi = {
 			newValues.COORD_X = Math.min(1, x);
 			newValues.COORD_Y = Math.min(1, y);
 
-			var rx = x + x - 1;
-			var ry = y + y - 1;
+			var rx = newValues.MANHATTAN_X = x + x - 1;
+			var ry = newValues.MANHATTAN_Y = y + y - 1;
 
 			// maximum vector length (from center) of 1
 			var d = Math.sqrt(rx * rx + ry * ry);
@@ -719,7 +725,11 @@ var pi = {
 			newValues.RADIAL_X = rx * d;
 			newValues.RADIAL_Y = ry * d;
 
+			// TODO FIRST scale deadZone properly for radial input; right now it's manhattan
+			// TODO NEXT have manhattan/euclidean scalings for gamepad analogs?
 			// TODO deadZone behavior update for COORD_X and COORD_Y
+			// TODO snapping behavior
+			// touchstart, touchleave, touchcancel differentiation
 
 			for (var component in newValues) {
 				var old = oldValues[component];
