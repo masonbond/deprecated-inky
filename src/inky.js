@@ -708,12 +708,12 @@ var pi = {
 			// TODO for (var i = 0, touch; touch = e.changedTouches[i]; ++i) if (touch.target === element) {
 			var touch = e.changedTouches[e.changedTouches.length - 1];
 
-			var x = (touch.pageX - rect.left) / width;
-			var y = (touch.pageY - rect.top) / height;
+			var x = Math.min(1, Math.max(0, (touch.pageX - rect.left) / width));
+			var y = Math.min(1, Math.max(0, (touch.pageY - rect.top) / height));
 
 			newValues.PRESSURE = touch.force;
-			newValues.COORD_X = Math.min(1, x);
-			newValues.COORD_Y = Math.min(1, y);
+			newValues.COORD_X = x;
+			newValues.COORD_Y = y;
 
 			var rx = newValues.MANHATTAN_X = x + x - 1;
 			var ry = newValues.MANHATTAN_Y = y + y - 1;
