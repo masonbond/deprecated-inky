@@ -16,7 +16,8 @@ var defaults = {
 	analogDeadZone: .2,
 	analogThreshold: .01,
 	touchDeadZone: .2,
-	touchThreshold: .01
+	touchThreshold: .01,
+	touchSnap: true
 };
 
 // static privates
@@ -660,6 +661,7 @@ var pi = {
 		}
 
 		var deviceCode = 'Touch Area' + (args && (args.name !== undefined) ? (': ' + args.name) : (' ' + touchAreaId));
+		var touchOrigin = {x: 0 y: 0}; // TODO touchOrigin
 		var oldValues = {
 			COORD_X: 0,
 			COORD_Y: 0,
@@ -683,6 +685,7 @@ var pi = {
 			enabled: args && (args.enabled !== undefined) ? args.enabled : defaults.touchAreaEnabled,
 			deadZone: args && (args.deadZone !== undefined) ? args.deadZone : defaults.touchDeadZone,
 			threshold: args && (args.threshold !== undefined) ? args.threshold : defaults.touchThreshold,
+			snap: args && (args.snap !== undefined) ? args.snap : defaults.touchSnap,
 			DEVICE: deviceCode,
 			COORD_X: deviceCode + ' Coord X',
 			COORD_Y: deviceCode + ' Coord Y',
@@ -696,31 +699,39 @@ var pi = {
 		++touchAreaId;
 
 		function touchHandler(e) {
-			var rect = element.getBoundingClientRect();
-			var width = rect.right - rect.left;
-			var height = rect.bottom - rect.top;
-			var xCenter = (rect.left + rect.right) / 2;
-			var yCenter = (rect.top + rect.bottom) / 2;
+			if (result.snap && e.type === 'touchend' || e.type === 'touchcancel') {
+				newValues.PRESSURE = 0;
+				newValues.COORD_X = newValues.COORD_Y = 0;
+				newValues.MANHATTAN_X = newValues.MANHATTAN_Y = 0;
+				newValues.RADIAL_X = newValues.RADIAL_Y = 0;
+			} else {
+				var rect = element.getBoundingClientRect();
+				var width = rect.right - rect.left;
+				var height = rect.bottom - rect.top;
+				var xCenter = (rect.left + rect.right) / 2;
+				var yCenter = (rect.top + rect.bottom) / 2;
 
-			// TODO for (var i = 0, touch; touch = e.changedTouches[i]; ++i) if (touch.target === element) {
-			var touch = e.changedTouches[e.changedTouches.length - 1];
+				// TODO for (var i = 0, touch; touch = e.changedTouches[i]; ++i) if (touch.target === element) {
+				var touch = e.changedTouches[e.changedTouches.length - 1];
 
-			var x = Math.min(1, Math.max(0, (touch.pageX - rect.left) / width));
-			var y = Math.min(1, Math.max(0, (touch.pageY - rect.top) / height));
+				var x = Math.min(1, Math.max(0, (touch.pageX - rect.left) / width));
+				var y = Math.min(1, Math.max(0, (touch.pageY - rect.top) / height));
 
-			newValues.PRESSURE = touch.force;
-			newValues.COORD_X = x;
-			newValues.COORD_Y = y;
+				newValues.PRESSURE = touch.force;
+				newValues.COORD_X = x;
+				newValues.COORD_Y = y;
 
-			var rx = newValues.MANHATTAN_X = x + x - 1;
-			var ry = newValues.MANHATTAN_Y = y + y - 1;
+				var rx = newValues.MANHATTAN_X = x + x - 1;
+				var ry = newValues.MANHATTAN_Y = y + y - 1;
 
-			// maximum vector length (from center) of 1
-			var d = Math.sqrt(rx * rx + ry * ry);
-			d = Math.min(1, d) / d;
+				// maximum vector length (from center) of 1
+				var d = Math.sqrt(rx * rx + ry * ry);
 
-			newValues.RADIAL_X = rx * d;
-			newValues.RADIAL_Y = ry * d;
+				d = Math.min(1, d) / d;
+
+				newValues.RADIAL_X = rx * d;
+				newValues.RADIAL_Y = ry * d;
+			}
 
 			// TODO FIRST scale deadZone properly for radial input; right now it's manhattan
 			// TODO NEXT have manhattan/euclidean scalings for gamepad analogs?
