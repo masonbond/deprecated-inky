@@ -703,7 +703,7 @@ var pi = {
 		++touchAreaId;
 
 		function touchHandler(e) {
-			if (result.snap && e.type === 'touchend' || e.type === 'touchcancel') {
+			if (result.snap && (e.type === 'touchend' || e.type === 'touchcancel')) {
 				newValues.PRESSURE = 0;
 				newValues.COORD_X = newValues.COORD_Y = 0;
 				newValues.MANHATTAN_X = newValues.MANHATTAN_Y = 0;
