@@ -18,6 +18,7 @@ UTILS.killEvent = function(e) {
 	if (e.stopPropagation) e.stopPropagation();
 	e.preventDefault();
 	e.cancelBubble = true;
+	return false;
 };
 
 // browser detection
