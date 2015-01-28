@@ -18,7 +18,8 @@ var defaults = {
 	touchDeadZone: .2,
 	touchThreshold: .01,
 	touchSnap: true,
-	touchFloatOrigin: true
+	touchFloatOrigin: true,
+	touchAllowScrolling: false
 };
 
 // static privates
@@ -688,6 +689,7 @@ var pi = {
 			threshold: args && (args.threshold !== undefined) ? args.threshold : defaults.touchThreshold,
 			snap: args && (args.snap !== undefined) ? args.snap : defaults.touchSnap,
 			floatOrigin: args && (args.floatOrigin !== undefined) ? args.floatOrigin : defaults.touchFloatOrigin,
+			allowScrolling: args && (args.allowScrolling !== undefined) ? args.allowScrolling : defaults.touchAllowScrolling,
 			DEVICE: deviceCode,
 			COORD_X: deviceCode + ' Coord X',
 			COORD_Y: deviceCode + ' Coord Y',
@@ -779,6 +781,8 @@ var pi = {
 				}
 			}
 			//}
+			
+			if (!result.allowScrolling) return UTILS.killEvent(e);
 		}
 
 		// listen for touch events on the element
