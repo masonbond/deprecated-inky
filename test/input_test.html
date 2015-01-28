@@ -57,7 +57,8 @@ var input2 = new IN.Dispatcher({
 });
 
 var smear = new IN.TouchArea({
-	element: smearElement
+	element: smearElement,
+	floatOrigin: false
 });
 
 console.log("smear", smear);
@@ -80,13 +81,17 @@ var c2 = new IN.Control({
 	}
 });
 
-var c = new IN.Control({
-	move: function(e){
-		//console.log("1", e, "moved by", e.data);
+function poop(e){
+	smearElement.innerHTML = e.type + " " + e.component + (e.move && e.move.v && (": " + e.move.v) || '');
+	if (e.type === IN.PRESS || e.type === IN.RELEASE) console.log(smearElement.innerHTML);
+}
 
-		smearElement.innerHTML = "move " + e.component + ": " + e.move.v;
-	}
+var c = new IN.Control({
+	press: poop,
+	move: poop,
+	release: poop
 });
+
 
 var binding = input.bind({
 	control: c,

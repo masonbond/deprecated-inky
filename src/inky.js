@@ -17,7 +17,8 @@ var defaults = {
 	analogThreshold: .01,
 	touchDeadZone: .2,
 	touchThreshold: .01,
-	touchSnap: true
+	touchSnap: true,
+	touchFloatOrigin: true
 };
 
 // static privates
@@ -661,7 +662,7 @@ var pi = {
 		}
 
 		var deviceCode = 'Touch Area' + (args && (args.name !== undefined) ? (': ' + args.name) : (' ' + touchAreaId));
-		var touchOrigin = {x: 0 y: 0}; // TODO touchOrigin
+		var touchOrigin = {x: 0, y: 0};
 		var oldValues = {
 			COORD_X: 0,
 			COORD_Y: 0,
@@ -686,6 +687,7 @@ var pi = {
 			deadZone: args && (args.deadZone !== undefined) ? args.deadZone : defaults.touchDeadZone,
 			threshold: args && (args.threshold !== undefined) ? args.threshold : defaults.touchThreshold,
 			snap: args && (args.snap !== undefined) ? args.snap : defaults.touchSnap,
+			floatOrigin: args && (args.floatOrigin !== undefined) ? args.floatOrigin : defaults.touchFloatOrigin,
 			DEVICE: deviceCode,
 			COORD_X: deviceCode + ' Coord X',
 			COORD_Y: deviceCode + ' Coord Y',
@@ -714,15 +716,30 @@ var pi = {
 				// TODO for (var i = 0, touch; touch = e.changedTouches[i]; ++i) if (touch.target === element) {
 				var touch = e.changedTouches[e.changedTouches.length - 1];
 
-				var x = Math.min(1, Math.max(0, (touch.pageX - rect.left) / width));
-				var y = Math.min(1, Math.max(0, (touch.pageY - rect.top) / height));
+				var x = (touch.pageX - rect.left) / width;
+				var y =  (touch.pageY - rect.top) / height;
 
 				newValues.PRESSURE = touch.force;
-				newValues.COORD_X = x;
-				newValues.COORD_Y = y;
+				newValues.COORD_X = Math.min(1, Math.max(0, x));
+				newValues.COORD_Y = Math.min(1, Math.max(0, y));
 
-				var rx = newValues.MANHATTAN_X = x + x - 1;
-				var ry = newValues.MANHATTAN_Y = y + y - 1;
+				var rx = x + x - 1;
+				var ry = y + y - 1;
+
+				if (e.type === 'touchstart') {
+					if (result.floatOrigin) {
+						touchOrigin.x = rx;
+						touchOrigin.y = ry;
+					} else {
+						touchOrigin.x = touchOrigin.y = 0;
+					}
+				}
+
+				rx = Math.min(1, Math.max(-1, rx - touchOrigin.x));
+				ry = Math.min(1, Math.max(-1, ry - touchOrigin.y));
+
+				newValues.MANHATTAN_X = rx;
+				newValues.MANHATTAN_Y = ry;
 
 				// maximum vector length (from center) of 1
 				var d = Math.sqrt(rx * rx + ry * ry);
@@ -733,11 +750,8 @@ var pi = {
 				newValues.RADIAL_Y = ry * d;
 			}
 
-			// TODO FIRST scale deadZone properly for radial input; right now it's manhattan
-			// TODO NEXT have manhattan/euclidean scalings for gamepad analogs?
+			// TODO have manhattan/euclidean scalings for gamepad analogs?
 			// TODO deadZone behavior update for COORD_X and COORD_Y
-			// TODO snapping behavior, at least for 'sticks'
-			// touchstart, touchleave, touchcancel differentiation
 
 			for (var component in newValues) {
 				var old = oldValues[component];
@@ -767,6 +781,7 @@ var pi = {
 			//}
 		}
 
+		// listen for touch events on the element
 		element.addEventListener("touchstart", touchHandler, false);
 		element.addEventListener("touchmove", touchHandler, false);
 		element.addEventListener("touchend", touchHandler, false);
