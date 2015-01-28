@@ -58,7 +58,8 @@ var input2 = new IN.Dispatcher({
 
 var smear = new IN.TouchArea({
 	element: smearElement,
-	floatOrigin: true
+	floatOrigin: true,
+	snap: false
 });
 
 console.log("smear", smear);
@@ -82,21 +83,25 @@ var c2 = new IN.Control({
 });
 
 function poop(e){
-	smearElement.innerHTML = e.type + " " + e.component + (e.move && e.move.v && (": " + e.move.v) || '');
-	if (e.type === IN.PRESS || e.type === IN.RELEASE) console.log(smearElement.innerHTML);
+	console.log(e);
+	if (e.component === smear.RADIAL_X) e.target.x = e.move.v;
+	else if (e.component === smear.RADIAL_Y) e.target.y = e.move.v;
+	smearElement.innerHTML = e.type + "<br>X: " + e.target.x + "<br>Y: " + e.target.y;
 }
 
 var c = new IN.Control({
-	press: poop,
-	move: poop,
-	release: poop
+	move: poop
 });
 
 
 var binding = input.bind({
 	control: c,
 	moveArgs: {butt: 1},
-	component: [IN.KEY_SPACE, IN.MOUSE_LEFT_BUTTON, IN.MOUSE_MOVE, IN.GAMEPAD_LEFT_STICK_X, smear.RADIAL_X]
+	target: {
+		x: 0,
+		y: 0
+	},
+	component: [IN.KEY_SPACE, IN.MOUSE_LEFT_BUTTON, IN.MOUSE_MOVE, IN.GAMEPAD_LEFT_STICK_X, smear.RADIAL_X, smear.RADIAL_Y]
 });
 
 console.log("binding", binding);
