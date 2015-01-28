@@ -31,7 +31,7 @@ UTILS.browserFamily = (navigator.userAgent.indexOf("MSIE") !== -1 || navigator.u
 UTILS.Timer = {startTime:0};
 
 UTILS.Timer.now = (function() {
-	var now = performance && (
+	var now = (typeof performance !== 'undefined') && (
 		performance.now
 		|| performance.webkitNow
 		|| performance.msNow
