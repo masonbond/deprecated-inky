@@ -565,7 +565,7 @@ var pi = {
 			enabled: args && (args.enabled !== undefined) ? args.enabled : defaults.dispatcherEnabled,
 			autoPoll: args && (args.autoPoll !== undefined) ? args.autoPoll : defaults.autoPoll,
 			pollRate: oldPollRate,
-			analogDeadZone: args && (args.analogDeadZone !== undefined) ? args.analogDeadZone : defaults.analogDeadZone,
+			analogDeadZone: Math.max(0.00001, args && (args.analogDeadZone !== undefined) ? args.analogDeadZone : defaults.analogDeadZone),
 			analogThreshold: args && (args.analogThreshold !== undefined) ? args.analogThreshold : defaults.analogThreshold,
 			allowContextMenu: args && (args.allowContextMenu !== undefined) ? args.allowContextMenu : defaults.allowContextMenu,
 			allowMiddleMouseScroll: args && (args.allowMiddleMouseScroll !== undefined) ? args.allowMiddleMouseScroll : defaults.allowMiddleMouseScroll,
@@ -685,7 +685,7 @@ var pi = {
 		var result = {
 			id: touchAreaId,
 			enabled: args && (args.enabled !== undefined) ? args.enabled : defaults.touchAreaEnabled,
-			deadZone: args && (args.deadZone !== undefined) ? args.deadZone : defaults.touchDeadZone,
+			deadZone: Math.max(0.00001, args && (args.deadZone !== undefined) ? args.deadZone : defaults.touchDeadZone),
 			threshold: args && (args.threshold !== undefined) ? args.threshold : defaults.touchThreshold,
 			snap: args && (args.snap !== undefined) ? args.snap : defaults.touchSnap,
 			floatOrigin: args && (args.floatOrigin !== undefined) ? args.floatOrigin : defaults.touchFloatOrigin,
