@@ -15,7 +15,7 @@ var defaults = {
 	allowDefaultKeyboardEvents: false,
 	analogDeadZone: .2,
 	analogThreshold: .01,
-	touchDeadZone: .2,
+	touchDeadZone: .1,
 	touchThreshold: .01,
 	touchSnap: true,
 	touchFloatOrigin: true,
@@ -710,16 +710,13 @@ var pi = {
 				newValues.RADIAL_X = newValues.RADIAL_Y = 0;
 			} else {
 				var rect = element.getBoundingClientRect();
-				var width = rect.right - rect.left;
-				var height = rect.bottom - rect.top;
 				var xCenter = (rect.left + rect.right) / 2;
 				var yCenter = (rect.top + rect.bottom) / 2;
 
 				// TODO for (var i = 0, touch; touch = e.changedTouches[i]; ++i) if (touch.target === element) {
 				var touch = e.changedTouches[e.changedTouches.length - 1];
-
-				var x = (touch.pageX - rect.left) / width;
-				var y =  (touch.pageY - rect.top) / height;
+				var x = (touch.clientX - rect.left) / rect.width;
+				var y =  (touch.clientY - rect.top) / rect.height;
 
 				newValues.PRESSURE = touch.force;
 				newValues.COORD_X = Math.min(1, Math.max(0, x));

@@ -12,6 +12,7 @@ body {
 }
 
 .test {
+	position: relative;
 	width: 300px;
 	height: 300px;
 	background: black;
@@ -29,11 +30,21 @@ background: radial-gradient(ellipse at center, rgba(0,0,0,1) 0%,rgba(255,0,0,1) 
 border-radius: 50%;
 }
 
+.test .stick-cap {
+	background: #fff;
+	border-radius: 50%;
+	width: 60%;
+	height: 60%;
+	margin: 20% 0 0 20%;
+	position: absolute;
+}
+
 </style>
 </head>
 <body>
 input test
-<div id="test" class="test">asdf</div>g<div id="test2" class="test">d</div>buns<div id="smear" class="test"></div>
+<div id="test" class="test">asdf</div>g<div id="test2" class="test">d</div>buns
+<div id="smear" class="test"><div class="stick-cap"></div></div>
 <input type="text" id="text1"><input type="text" id="text2">
 
 <script>
@@ -58,9 +69,11 @@ var input2 = new IN.Dispatcher({
 
 var smear = new IN.TouchArea({
 	element: smearElement,
-	floatOrigin: true,
-	snap: false
+	floatOrigin: false,
+	snap: true
 });
+
+var smearCap = smearElement.childNodes[0];
 
 console.log("smear", smear);
 
@@ -83,10 +96,13 @@ var c2 = new IN.Control({
 });
 
 function poop(e){
-	console.log(e);
 	if (e.component === smear.RADIAL_X) e.target.x = e.move.v;
 	else if (e.component === smear.RADIAL_Y) e.target.y = e.move.v;
-	smearElement.innerHTML = e.type + "<br>X: " + e.target.x + "<br>Y: " + e.target.y;
+	console.log(e.type + "<br>X: " + e.target.x + "<br>Y: " + e.target.y);
+
+	var rect = smearElement.getBoundingClientRect();
+	smearCap.style.top = (e.target.y * (rect.bottom - rect.top) / 2) + 'px';
+	smearCap.style.left = (e.target.x * (rect.right - rect.left) / 2) + 'px';
 }
 
 var c = new IN.Control({
