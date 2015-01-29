@@ -734,15 +734,15 @@ var pi = {
 					}
 				}
 
-				rx = Math.min(1, Math.max(-1, rx - touchOrigin.x));
-				ry = Math.min(1, Math.max(-1, ry - touchOrigin.y));
 
-				// RFI do we need to take deadZone into account here to ensure normalized distances are correct?
 				if (Math.abs(rx) < result.deadZone) rx = 0;
-				if (Math.abs(ry) < result.deadZone) ry = 0;
+				else rx = rx - touchOrigin.x;
 
-				newValues.MANHATTAN_X = rx;
-				newValues.MANHATTAN_Y = ry;
+				if (Math.abs(ry) < result.deadZone) ry = 0;
+				else ry = ry - touchOrigin.y;
+
+				newValues.MANHATTAN_X = Math.min(1, Math.max(-1, rx));
+				newValues.MANHATTAN_Y = Math.min(1, Math.max(-1, ry));
 
 				// maximum vector length (from center) of 1
 				var d = Math.sqrt(rx * rx + ry * ry);
