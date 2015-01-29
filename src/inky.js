@@ -714,7 +714,7 @@ var pi = {
 				var yCenter = (rect.top + rect.bottom) / 2;
 
 				// TODO for (var i = 0, touch; touch = e.changedTouches[i]; ++i) if (touch.target === element) {
-				var touch = e.changedTouches[e.changedTouches.length - 1];
+				var touch = e.targetTouches[e.targetTouches.length - 1];
 				var x = (touch.clientX - rect.left) / rect.width;
 				var y =  (touch.clientY - rect.top) / rect.height;
 
