@@ -734,7 +734,6 @@ var pi = {
 					}
 				}
 
-
 				if (Math.abs(rx) < result.deadZone) rx = 0;
 				else rx = rx - touchOrigin.x;
 
@@ -747,7 +746,8 @@ var pi = {
 				// maximum vector length (from center) of 1
 				var d = Math.sqrt(rx * rx + ry * ry);
 
-				if (d > 0) d = Math.min(1, d) / d;
+				if (d <= 1) d = 1;
+				else d = 1 / d;
 
 				newValues.RADIAL_X = rx * d;
 				newValues.RADIAL_Y = ry * d;
