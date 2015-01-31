@@ -662,6 +662,8 @@ var pi = {
 			return false;
 		}
 
+		// TODO BUTTON_TOUCH component?
+
 		var deviceCode = 'Touch Area' + (args && (args.name !== undefined) ? (': ' + args.name) : (' ' + touchAreaId));
 		var touchOrigin = {x: 0, y: 0};
 		var oldValues = {
@@ -744,10 +746,10 @@ var pi = {
 				newValues.MANHATTAN_Y = Math.min(1, Math.max(-1, ry));
 
 				// maximum vector length (from center) of 1
-				var d = Math.sqrt(rx * rx + ry * ry);
+				var d = rx * rx + ry * ry;
 
 				if (d <= 1) d = 1;
-				else d = 1 / d;
+				else d = 1 / Math.sqrt(d);
 
 				newValues.RADIAL_X = rx * d;
 				newValues.RADIAL_Y = ry * d;
@@ -755,6 +757,7 @@ var pi = {
 
 			// TODO have manhattan/euclidean scalings for gamepad analogs?
 			// TODO deadZone behavior update for COORD_X and COORD_Y
+			// TODO function as move arg type
 
 			for (var component in newValues) {
 				var old = oldValues[component];
