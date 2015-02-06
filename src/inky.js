@@ -688,17 +688,6 @@ var pi = {
 
 		++userDeviceId;
 
-		/*
-		var exampleEvents = {
-			"mousemove": {
-				node: document,
-				callback: function(e) {
-					// turds
-				}
-			}
-		};
-		// turd */
-
 		// helpers
 
 		function raiseEvents() {
@@ -710,7 +699,6 @@ var pi = {
 
 				if (result.threshold === 0 || Math.abs(diff) >= result.threshold) {
 					if (Math.abs(cur) >= result.deadZone) {
-						console.log("buttholes", cur, old, diff, result);
 						if (Math.abs(old) < result.deadZone) pi.press(component);
 						pi.move(component, {v: cur, dv: diff});
 					} else {
