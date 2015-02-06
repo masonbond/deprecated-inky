@@ -15,6 +15,7 @@ var defaults = {
 	allowDefaultKeyboardEvents: false,
 	analogDeadZone: .2,
 	analogThreshold: .01,
+	deviceEnabled: true,
 	devicePollRate: 33,
 	deviceDeadZone: 0,
 	deviceThreshold: 0,
@@ -672,6 +673,8 @@ var pi = {
 	Device: function(args) {
 		var newValues = {},
 			result = {
+				enabled: args && args.enabled !== undefined && args.enabled || defaults.deviceEnabled,
+				id: userDeviceId,
 				events: args && args.events || {},
 				pollRate: args && (args.pollRate !== undefined) && args.pollrate || defaults.devicePollRate,
 				poll: args && args.poll || undefined,
@@ -691,6 +694,8 @@ var pi = {
 		// helpers
 
 		function raiseEvents() {
+			if (!result.enabled) return;
+
 			for (var c in newValues) {
 				var component = result[c],
 					old = pi.async[component],
@@ -737,7 +742,7 @@ var pi = {
 		}
 
 		// call user's own init func
-		if (args && typeof args.init === 'function') args.init.call(result, args);
+		if (args && typeof args.init === 'function') args.init.call(result, eventContext);
 
 		if (typeof result.poll === 'function') setInterval(function() {
 			eventContext.event = undefined;
@@ -748,93 +753,83 @@ var pi = {
 		return result;
 	},
 	TouchArea: function(args) {
-		var element = args && args.element;
-
-		if (!(element && element.nodeType)) {
-			// TODO error, not valid DOM element
-			return false;
-		}
-
-		var deviceCode = 'Touch Area' + (args && (args.name !== undefined) ? (': ' + args.name) : (' ' + touchAreaId));
-		var touchOrigin = {x: 0, y: 0};
-		var oldValues = {
-			COORD_X: 0,
-			COORD_Y: 0,
-			MANHATTAN_X: 0,
-			MANHATTAN_Y: 0,
-			RADIAL_X: 0,
-			RADIAL_Y: 0,
-			PRESSURE: 0
-		};
-		var newValues = {
-			COORD_X: 0,
-			COORD_Y: 0,
-			MANHATTAN_X: 0,
-			MANHATTAN_Y: 0,
-			RADIAL_X: 0,
-			RADIAL_Y: 0,
-			PRESSURE: 0
-		};
-		var result = {
-			id: touchAreaId,
-			enabled: args && (args.enabled !== undefined) ? args.enabled : defaults.touchAreaEnabled,
-			deadZone: Math.max(0.00001, args && (args.deadZone !== undefined) ? args.deadZone : defaults.touchDeadZone),
-			threshold: args && (args.threshold !== undefined) ? args.threshold : defaults.touchThreshold,
-			snap: args && (args.snap !== undefined) ? args.snap : defaults.touchSnap,
-			floatOrigin: args && (args.floatOrigin !== undefined) ? args.floatOrigin : defaults.touchFloatOrigin,
-			allowScrolling: args && (args.allowScrolling !== undefined) ? args.allowScrolling : defaults.touchAllowScrolling,
-			DEVICE: deviceCode,
-			COORD_X: deviceCode + ' Coord X',
-			COORD_Y: deviceCode + ' Coord Y',
-			MANHATTAN_X: deviceCode + ' Manhattan X',
-			MANHATTAN_Y: deviceCode + ' Manhattan Y',
-			RADIAL_X: deviceCode + ' Radial X',
-			RADIAL_Y: deviceCode + ' Radial Y',
-			PRESSURE: deviceCode + ' Pressure'
+		// construct a new TouchArea by extending a Device object
+		var touchListener = { 
+			node: args && args.element,
+			callback: touchHandler
 		};
 
-		++touchAreaId;
+		// construct device
+		var result = new IN.Device({
+			name: args && args.name,
+			events: {
+				touchstart: touchListener,
+				touchmove: touchListener,
+				touchend: touchListener,
+				touchleave: touchListener,
+				touchcancel: touchListener
+			},
+			components: {
+				COORD_X: 'Coord X',
+				COORD_Y: 'Coord Y',
+				MANHATTAN_X: 'Manhattan X',
+				MANHATTAN_Y: 'Manhattan Y',
+				RADIAL_X: 'Radial X',
+				RADIAL_Y: 'Radial Y',
+				PRESSURE: 'Pressure'
+			},
+			init: function(e) {
+				e.touchOrigin = {x: 0, y: 0};
+			}
+		});
+
+		// extended properties
+		result.element = touchListener.node;
+		result.allowScrolling = args && args.allowScrolling !== undefined && args.allowScrolling || defaults.touchAllowScrolling;
+		result.snap = args && (args.snap !== undefined) ? args.snap : defaults.touchSnap;
+		result.floatOrigin = args && (args.floatOrigin !== undefined) ? args.floatOrigin : defaults.touchFloatOrigin;
+		result.allowScrolling = args && (args.allowScrolling !== undefined) ? args.allowScrolling : defaults.touchAllowScrolling;
 
 		function touchHandler(e) {
-			if (result.snap && (e.type === 'touchend' || e.type === 'touchcancel')) {
-				newValues.PRESSURE = 0;
-				newValues.COORD_X = newValues.COORD_Y = 0;
-				newValues.MANHATTAN_X = newValues.MANHATTAN_Y = 0;
-				newValues.RADIAL_X = newValues.RADIAL_Y = 0;
+			if (result.snap && (e.event.type === 'touchend' || e.event.type === 'touchcancel')) {
+				e.values.PRESSURE = 0;
+				e.values.COORD_X = e.values.COORD_Y = 0;
+				e.values.MANHATTAN_X = e.values.MANHATTAN_Y = 0;
+				e.values.RADIAL_X = e.values.RADIAL_Y = 0;
 			} else {
-				var rect = element.getBoundingClientRect();
+				var rect = result.element.getBoundingClientRect();
 				var xCenter = (rect.left + rect.right) / 2;
 				var yCenter = (rect.top + rect.bottom) / 2;
 
 				// TODO for (var i = 0, touch; touch = e.changedTouches[i]; ++i) if (touch.target === element) {
-				var touch = e.targetTouches[e.targetTouches.length - 1];
+				var touch = e.event.targetTouches[e.event.targetTouches.length - 1];
 				var x = (touch.clientX - rect.left) / rect.width;
 				var y =  (touch.clientY - rect.top) / rect.height;
 
-				newValues.PRESSURE = touch.force;
-				newValues.COORD_X = Math.min(1, Math.max(0, x));
-				newValues.COORD_Y = Math.min(1, Math.max(0, y));
+				e.values.PRESSURE = touch.force;
+				e.values.COORD_X = Math.min(1, Math.max(0, x));
+				e.values.COORD_Y = Math.min(1, Math.max(0, y));
 
 				var rx = x + x - 1;
 				var ry = y + y - 1;
 
-				if (e.type === 'touchstart') {
+				if (e.event.type === 'touchstart') {
 					if (result.floatOrigin) {
-						touchOrigin.x = rx;
-						touchOrigin.y = ry;
+						e.touchOrigin.x = rx;
+						e.touchOrigin.y = ry;
 					} else {
-						touchOrigin.x = touchOrigin.y = 0;
+						e.touchOrigin.x = e.touchOrigin.y = 0;
 					}
 				}
 
 				if (Math.abs(rx) < result.deadZone) rx = 0;
-				else rx = rx - touchOrigin.x;
+				else rx = rx - e.touchOrigin.x;
 
 				if (Math.abs(ry) < result.deadZone) ry = 0;
-				else ry = ry - touchOrigin.y;
+				else ry = ry - e.touchOrigin.y;
 
-				newValues.MANHATxTAN_X = Math.min(1, Math.max(-1, rx));
-				newValues.MANHATTAN_Y = Math.min(1, Math.max(-1, ry));
+				e.values.MANHATTAN_X = Math.min(1, Math.max(-1, rx));
+				e.values.MANHATTAN_Y = Math.min(1, Math.max(-1, ry));
 
 				// maximum vector length (from center) of 1
 				var d = rx * rx + ry * ry;
@@ -842,46 +837,12 @@ var pi = {
 				if (d <= 1) d = 1;
 				else d = 1 / Math.sqrt(d);
 
-				newValues.RADIAL_X = rx * d;
-				newValues.RADIAL_Y = ry * d;
+				e.values.RADIAL_X = rx * d;
+				e.values.RADIAL_Y = ry * d;
 			}
 
-			for (var component in newValues) {
-				var old = oldValues[component];
-				var cur = newValues[component];
-				var diff = cur - old;
-				var componentCode = result[component];
-
-				if (Math.abs(diff) >= result.threshold) {
-					pi.async[componentCode] = cur;
-
-					if (Math.abs(cur) >= result.deadZone) {
-						if (Math.abs(old) < result.deadZone) pi.press(componentCode);
-						pi.move(componentCode, {v: cur, dv: diff});
-					} else {
-						cur = 0;
-						diff = -old;
-
-						if (Math.abs(old) >= result.deadZone) {
-							pi.move(componentCode, {v: cur, dv: diff});
-							pi.release(componentCode);
-						}
-					}
-
-					oldValues[component] = cur;
-				}
-			}
-			//}
-
-			if (!result.allowScrolling) return UTILS.killEvent(e);
+			if (!result.allowScrolling) UTILS.killEvent(e.event);
 		}
-
-		// listen for touch events on the element
-		element.addEventListener("touchstart", touchHandler, false);
-		element.addEventListener("touchmove", touchHandler, false);
-		element.addEventListener("touchend", touchHandler, false);
-		element.addEventListener("touchleave", touchHandler, false);
-		element.addEventListener("touchcancel", touchHandler, false);
 
 		return result;
 	}
