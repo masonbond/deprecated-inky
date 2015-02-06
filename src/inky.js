@@ -675,7 +675,7 @@ var pi = {
 				events: args && args.events || {},
 				pollRate: args && (args.pollRate !== undefined) && args.pollrate || defaults.devicePollRate,
 				poll: args && args.poll || undefined,
-				DEVICE: args && (args.name !== undefined)  && args.name || ('User-Defined Device ' + userDeviceId),
+				DEVICE: args && args.name !== undefined && args.name || ('User-Defined Device ' + userDeviceId),
 				components: args && (typeof args.components === 'object') && args.components || {COMPONENT: 'Component'},
 				deadZone: Math.max(0.00001, args && (args.deadZone !== undefined) && args.deadZone || defaults.deviceDeadZone),
 				threshold: args && (args.threshold !== undefined) && args.threshold || defaults.deviceThreshold,
@@ -720,6 +720,7 @@ var pi = {
 		// add component codes to stuff
 		for (var c in result.components) {
 			result[c] = result.DEVICE + ' ' + result.components[c];
+			componentToDevice[result[c]] = result.DEVICE;
 			newValues[c] = pi.async[result[c]] = 0;
 		}
 
