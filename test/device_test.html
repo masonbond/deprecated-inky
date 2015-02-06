@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+body { background-color: #222; }
+</style>
+</head>
+<body>
+
+<script src="../src/utils.js"></script>
+<script src="../src/inky.js"></script>
+<script>
+console.log("functs");
+	var fart = new IN.Device({
+		events: {
+			mousedown: {
+				callback: function(e) {
+					e.values.MOUSE_CLICK = 1;
+					console.log("dance too much booty in the pants", IN.async[fart.MOUSE_CLICK]);
+				}
+			},
+			mouseup: {
+				callback: function(e) {
+					e.values.MOUSE_CLICK = 0;
+					console.log("dance too much doody in the pants", IN.async[fart.MOUSE_CLICK]);
+				}
+			}
+		},
+		components: {
+			MOUSE_CLICK: 'Mouse Click!!!!'
+		}
+	});
+
+	var c = new IN.Control({
+		move: function(e) {
+			console.log('move', e);
+		}
+	});
+
+	var input = new IN.Dispatcher();
+
+	var binding = new input.bind({
+		control: c,
+		component: fart.MOUSE_CLICK
+	});
+
+	console.log(fart);
+</script>
+
+</body>
+</html>

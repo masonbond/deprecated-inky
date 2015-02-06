@@ -133,7 +133,7 @@ tr td:first-child {
 
 <a id="introduction"><h2>Introduction</h2></a>
 
-<p>inky is a JavaScript library that simplifies detecting and responding to user input on the keyboard, mouse, and on supporting browsers, gamepads.  It exposes a clean and simple interface that lets you write generic input handling code without dealing with device or browser specific details.</p>
+<p>inky is a JavaScript library that simplifies detecting and responding to user input on the keyboard, mouse, and on supporting browsers, gamepads and touchscreens.  It exposes a clean and simple interface that lets you write generic input handling code without dealing with device or browser specific details.</p>
 
 <p>With inky you can quickly set and change controls to manipulate objects, map and re-map key and button bindings and, if you wish, easily allow your users to do the same during runtime.</p>
 
@@ -191,12 +191,12 @@ Space held for 113.0000000121072 ms
 Space held for 163.00000000046566 ms
 Space released after 179.99999999301508 ms
 pressed and released 2 times</code></pre>
-<p>This is an example of using Controls, a flexible and important feature of inky.  If all you need is the state of the spacebar at a given moment, inky also exposes the asynchronous input state:</p>
+<p>This is an example of using Controls, a main feature of inky.  If all you need is the state of the spacebar at a given moment, inky also exposes the asynchronous input state:</p>
 <pre><code>console.log(IN.async[IN.KEY_SPACE]); <span class="comment">// 1 if down, undefined if up</span></code></pre>
 <p>You still need to create a <code>Dispatcher</code> object in order to use <code>IN.async</code>, even if you don't use any Controls.</p>
 
 <h2><a id="controls-and-callbacks">Controls and callbacks</a></h2>
-Think of a <code>Control</code> as collection of callbacks that react to changes in the state of an input component.  Which component isn't important; keyboard key, gamepad stick or mouse wheel, a <code>Control</code> will let you handle them predictably and interchangeably.</p>
+Think of a <code>Control</code> as a declaration of how an input component should affect the page state.  Which component isn't important; keyboard key, gamepad stick or mouse wheel, a <code>Control</code> will let you handle them predictably and interchangeably.</p>
 <p>Here's a basic rundown of the anatomy of a <code>Control</code>:</p>
 <pre><code><span class="keyword">var</span> c = <span class="keyword">new</span> IN.Control({
 	press: <span class="keyword">function</span>(e) {
@@ -291,6 +291,9 @@ d.enabled = false; <span class="comment">// d is now disabled</span></code></pre
 
 <h3>Dispatcher methods</h3>
 <p>You can also call the following methods to interact with a dispatcher:</p>
+
+<h2>Creating touch-enabled apps with TouchArea</h2>
+<p></p>
 
 <h4>Going deeper</h4>
 <p>This is some detailed information right here</p>

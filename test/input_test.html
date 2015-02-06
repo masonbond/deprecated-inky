@@ -82,7 +82,9 @@ var input2 = new IN.Dispatcher({
 var smear = new IN.TouchArea({
 	element: smearElement,
 	floatOrigin: true,
-	snap: true
+	snap: true,
+	deadZone: 0,
+	threshold: 0.00001
 });
 
 var smearCap = smearElement.childNodes[0];
@@ -110,7 +112,9 @@ var c2 = new IN.Control({
 function poop(e){
 	if (e.component === smear.RADIAL_X) e.target.x = e.move.v;
 	else if (e.component === smear.RADIAL_Y) e.target.y = e.move.v;
-	smearCap.innerHTML = e.type + "<br>X: " + e.target.x + "<br>Y: " + e.target.y;
+	else if (e.component === smear.PRESSURE) e.target.p = e.move.v;
+
+	smearCap.innerHTML = e.type + "<br>X: " + e.target.x + "<br>Y: " + e.target.y + "<br>pressure: " + e.target.pressure;
 	console.log(smearCap.innerHTML);
 
 	var rect = smearElement.getBoundingClientRect();
@@ -130,7 +134,7 @@ var binding = input.bind({
 		x: 0,
 		y: 0
 	},
-	component: [IN.KEY_SPACE, IN.MOUSE_LEFT_BUTTON, IN.MOUSE_MOVE, IN.GAMEPAD_LEFT_STICK_X, smear.RADIAL_X, smear.RADIAL_Y, smear.MANHATTAN_X, smear.MANHATTAN_Y]
+	component: [IN.KEY_SPACE, IN.MOUSE_LEFT_BUTTON, IN.MOUSE_MOVE, IN.GAMEPAD_LEFT_STICK_X, smear.RADIAL_X, smear.RADIAL_Y, smear.MANHATTAN_X, smear.MANHATTAN_Y, smear.PRESSURE]
 });
 
 console.log("binding", binding);

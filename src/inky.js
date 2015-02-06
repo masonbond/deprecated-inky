@@ -15,12 +15,26 @@ var defaults = {
 	allowDefaultKeyboardEvents: false,
 	analogDeadZone: .2,
 	analogThreshold: .01,
+	devicePollRate: 33,
+	deviceDeadZone: 0,
+	deviceThreshold: 0,
+	deviceCapture: false,
 	touchDeadZone: .1,
 	touchThreshold: .01,
 	touchSnap: true,
 	touchFloatOrigin: true,
 	touchAllowScrolling: false
 };
+
+// TODO refactor TouchArea to use Device
+// TODO refactor Gamepad to use Device
+// TODO refactor Keyboard to use Device
+// TODO refactor Mouse to use Device
+// TODO have manhattan/euclidean scalings for gamepad analogs?
+// TODO deadZone behavior update for COORD_X and COORD_Y
+// TODO function as move arg type
+// TODO PRESSURE press and release (move will have to wait?)
+// TODO orientation
 
 // static privates
 
@@ -213,9 +227,10 @@ document.addEventListener("pointerlockerror", pointerLockError);
 document.addEventListener("mozpointerlockerror", pointerLockError);
 document.addEventListener("webkitpointerlockerror", pointerLockError);
 
-// touch component stuff
+// device stuff
 
 var touchAreaId = 0;
+var userDeviceId = 0;
 
 // dispatcher list for custom components
 
@@ -654,6 +669,95 @@ var pi = {
 			release: args.release
 		};
 	},
+	Device: function(args) {
+		var newValues = {},
+			result = {
+				events: args && args.events || {},
+				pollRate: args && (args.pollRate !== undefined) && args.pollrate || defaults.devicePollRate,
+				poll: args && args.poll || undefined,
+				DEVICE: args && (args.name !== undefined)  && args.name || ('User-Defined Device ' + userDeviceId),
+				components: args && (typeof args.components === 'object') && args.components || {COMPONENT: 'Component'},
+				deadZone: Math.max(0.00001, args && (args.deadZone !== undefined) && args.deadZone || defaults.deviceDeadZone),
+				threshold: args && (args.threshold !== undefined) && args.threshold || defaults.deviceThreshold,
+			},
+			eventContext = {
+				values: newValues,
+				device: result,
+				event: undefined
+			};
+
+		++userDeviceId;
+
+		/*
+		var exampleEvents = {
+			"mousemove": {
+				node: document,
+				callback: function(e) {
+					// turds
+				}
+			}
+		};
+		// turd */
+
+		// helpers
+
+		function raiseEvents() {
+			for (var c in newValues) {
+				var component = result[c],
+					old = pi.async[component],
+					cur = newValues[c],
+					diff = cur - old;
+
+				if (result.threshold === 0 || Math.abs(diff) >= result.threshold) {
+					if (Math.abs(cur) >= result.deadZone) {
+						console.log("buttholes", cur, old, diff, result);
+						if (Math.abs(old) < result.deadZone) pi.press(component);
+						pi.move(component, {v: cur, dv: diff});
+					} else {
+						cur = 0;
+						diff = -old;
+
+						if (Math.abs(old) >= result.deadZone) {
+							pi.move(component, {v: cur, dv: diff});
+							pi.release(component);
+						}
+					}
+
+					// update async table
+					pi.async[component] = cur;
+				}
+			}
+		}
+
+		// add component codes to stuff
+		for (var c in result.components) {
+			result[c] = result.DEVICE + ' ' + result.components[c];
+			newValues[c] = pi.async[result[c]] = 0;
+		}
+
+		// listen for events
+		for (var eventName in result.events) {
+			var e = result.events[eventName];
+			if (typeof e.callback === 'function') (e.node || document).addEventListener(eventName, (function(e){
+				return function(event) {
+					eventContext.event = event;
+					var callbackResult = e.callback(eventContext);
+					if (callbackResult === undefined || callbackResult) raiseEvents();
+				};
+			}(e)), e.capture || defaults.deviceCapture);
+		}
+
+		// call user's own init func
+		if (args && typeof args.init === 'function') args.init.call(result, args);
+
+		if (typeof result.poll === 'function') setInterval(function() {
+			eventContext.event = undefined;
+			var pollResult = result.poll(eventContext);
+			if (pollResult === undefined || pollResult) raiseEvents();
+		}, result.pollRate);
+
+		return result;
+	},
 	TouchArea: function(args) {
 		var element = args && args.element;
 
@@ -661,8 +765,6 @@ var pi = {
 			// TODO error, not valid DOM element
 			return false;
 		}
-
-		// TODO BUTTON_TOUCH component?
 
 		var deviceCode = 'Touch Area' + (args && (args.name !== undefined) ? (': ' + args.name) : (' ' + touchAreaId));
 		var touchOrigin = {x: 0, y: 0};
@@ -742,7 +844,7 @@ var pi = {
 				if (Math.abs(ry) < result.deadZone) ry = 0;
 				else ry = ry - touchOrigin.y;
 
-				newValues.MANHATTAN_X = Math.min(1, Math.max(-1, rx));
+				newValues.MANHATxTAN_X = Math.min(1, Math.max(-1, rx));
 				newValues.MANHATTAN_Y = Math.min(1, Math.max(-1, ry));
 
 				// maximum vector length (from center) of 1
@@ -754,10 +856,6 @@ var pi = {
 				newValues.RADIAL_X = rx * d;
 				newValues.RADIAL_Y = ry * d;
 			}
-
-			// TODO have manhattan/euclidean scalings for gamepad analogs?
-			// TODO deadZone behavior update for COORD_X and COORD_Y
-			// TODO function as move arg type
 
 			for (var component in newValues) {
 				var old = oldValues[component];
