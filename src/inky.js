@@ -256,7 +256,7 @@ var pi = {
 	Mouse: {
 		position: {x: undefined, y: undefined},
 		exitPointerLock: function(onExit) {
-			document.exitPointerLock = document.exitPointerLock || document[UTILS.getMember(document, ["webkitExitPointerLock", "mozExitPointerLock"])];
+			document.exitPointerLock = document[UTILS.getMember(document, ["exitPointerLock", "webkitExitPointerLock", "mozExitPointerLock"])];
 			onExitPointerLock = onExit;
 			document.exitPointerLock();
 		},
