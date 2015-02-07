@@ -115,7 +115,7 @@ function poop(e){
 	else if (e.component === smear.RADIAL_Y) e.target.y = e.move.v;
 	else if (e.component === smear.PRESSURE) e.target.p = e.move.v;
 
-	smearCap.innerHTML = e.type + "<br>X: " + e.target.x + "<br>Y: " + e.target.y + "<br>pressure: " + e.target.pressure;
+	smearCap.innerHTML = e.type + "<br>X: " + e.target.x + "<br>Y: " + e.target.y + "<br>pressure: " + e.target.p;
 	console.log(e.component, smearCap.innerHTML);
 
 	var rect = smearElement.getBoundingClientRect();

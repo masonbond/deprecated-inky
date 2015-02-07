@@ -28,7 +28,6 @@ var defaults = {
 };
 
 // TODO have manhattan/euclidean scalings for gamepad analogs?
-// TODO deadZone behavior update for TouchArea.SLIDER_X and Y
 // TODO allow function as move arg type
 // TODO orientation
 // TODO multitouch audit/necessary fixes
@@ -818,11 +817,8 @@ var pi = {
 					}
 				}
 
-				if (Math.abs(rx) < result.deadZone) rx = 0;
-				else rx = rx - e.touchOrigin.x;
-
-				if (Math.abs(ry) < result.deadZone) ry = 0;
-				else ry = ry - e.touchOrigin.y;
+				rx = rx - e.touchOrigin.x;
+				ry = ry - e.touchOrigin.y;
 
 				e.values.MANHATTAN_X = Math.min(1, Math.max(-1, rx));
 				e.values.MANHATTAN_Y = Math.min(1, Math.max(-1, ry));
