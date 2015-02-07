@@ -266,7 +266,7 @@ var pi = {
 		var oldTargetElement = args && args.element || document.body;
 		var DOMElement = oldTargetElement;
 		var listeners = {};
-		var oldPollRate = args && (args.pollRate !== undefined) ? args.pollRate : defaults.pollRate;
+		var oldPollRate = args && args.pollRate !== undefined ? args.pollRate : defaults.pollRate;
 		var pollInterval = setInterval(autoPoll, oldPollRate);
 		var pads = [];
 		var oldMX = undefined, oldMY = undefined;
@@ -578,17 +578,17 @@ var pi = {
 		addDOMListeners();
 
 		var result = {
-			enabled: args && (args.enabled !== undefined) ? args.enabled : defaults.dispatcherEnabled,
-			autoPoll: args && (args.autoPoll !== undefined) ? args.autoPoll : defaults.autoPoll,
+			enabled: args && args.enabled !== undefined ? args.enabled : defaults.dispatcherEnabled,
+			autoPoll: args && args.autoPoll !== undefined ? args.autoPoll : defaults.autoPoll,
 			pollRate: oldPollRate,
-			analogDeadZone: Math.max(0.00001, args && (args.analogDeadZone !== undefined) ? args.analogDeadZone : defaults.analogDeadZone),
-			analogThreshold: args && (args.analogThreshold !== undefined) ? args.analogThreshold : defaults.analogThreshold,
-			allowContextMenu: args && (args.allowContextMenu !== undefined) ? args.allowContextMenu : defaults.allowContextMenu,
-			allowMiddleMouseScroll: args && (args.allowMiddleMouseScroll !== undefined) ? args.allowMiddleMouseScroll : defaults.allowMiddleMouseScroll,
-			allowSelect: args && (args.allowSelect !== undefined) ? args.allowSelect : defaults.allowSelect,
-			allowDrag: args && (args.allowDrag !== undefined) ? args.allowDrag : defaults.allowDrag,
-			allowFocusOnHover: args && (args.allowFocusOnHover !== undefined) ? args.allowFocusOnHover : defaults.allowFocusOnHover,
-			allowDefaultKeyboardEvents: args && (args.allowDefaultKeyboardEvents !== undefined) ? args.allowDefaultKeyboardEvents : defaults.allowDefaultKeyboardEvents,
+			analogDeadZone: Math.max(0.00001, args && args.analogDeadZone !== undefined ? args.analogDeadZone : defaults.analogDeadZone),
+			analogThreshold: args && args.analogThreshold !== undefined ? args.analogThreshold : defaults.analogThreshold,
+			allowContextMenu: args && args.allowContextMenu !== undefined ? args.allowContextMenu : defaults.allowContextMenu,
+			allowMiddleMouseScroll: args && args.allowMiddleMouseScroll !== undefined ? args.allowMiddleMouseScroll : defaults.allowMiddleMouseScroll,
+			allowSelect: args && args.allowSelect !== undefined ? args.allowSelect : defaults.allowSelect,
+			allowDrag: args && args.allowDrag !== undefined ? args.allowDrag : defaults.allowDrag,
+			allowFocusOnHover: args && args.allowFocusOnHover !== undefined ? args.allowFocusOnHover : defaults.allowFocusOnHover,
+			allowDefaultKeyboardEvents: args && args.allowDefaultKeyboardEvents !== undefined ? args.allowDefaultKeyboardEvents : defaults.allowDefaultKeyboardEvents,
 			element: oldTargetElement,
 			press: function(component, time) {
 				if (result.enabled) raiseEvents(result, listeners[component], beforePress, component, time);
@@ -663,7 +663,7 @@ var pi = {
 	},
 	Control: function(args) {
 		return {
-			enabled: args && (args.enabled !== undefined) ? args.enabled : defaults.controlEnabled,
+			enabled: args && args.enabled !== undefined ? args.enabled : defaults.controlEnabled,
 			move: args.move,
 			press: args.press,
 			hold: args.hold,
@@ -676,12 +676,12 @@ var pi = {
 				enabled: args && args.enabled !== undefined && args.enabled || defaults.deviceEnabled,
 				id: userDeviceId,
 				events: args && args.events || {},
-				pollRate: args && (args.pollRate !== undefined) && args.pollrate || defaults.devicePollRate,
+				pollRate: args && args.pollRate !== undefined && args.pollrate || defaults.devicePollRate,
 				poll: args && args.poll || undefined,
 				DEVICE: args && args.name !== undefined && args.name || ('User-Defined Device ' + userDeviceId),
-				components: args && (typeof args.components === 'object') && args.components || {COMPONENT: 'Component'},
-				deadZone: Math.max(0.00001, args && (args.deadZone !== undefined) && args.deadZone || defaults.deviceDeadZone),
-				threshold: args && (args.threshold !== undefined) && args.threshold || defaults.deviceThreshold,
+				components: args && typeof args.components === 'object' && args.components || {COMPONENT: 'Component'},
+				deadZone: Math.max(0.00001, args && args.deadZone !== undefined && args.deadZone || defaults.deviceDeadZone),
+				threshold: args && args.threshold !== undefined && args.threshold || defaults.deviceThreshold,
 			},
 			eventContext = {
 				values: newValues,
@@ -786,9 +786,9 @@ var pi = {
 		// extended properties
 		result.element = touchListener.node;
 		result.allowScrolling = args && args.allowScrolling !== undefined && args.allowScrolling || defaults.touchAllowScrolling;
-		result.snap = args && (args.snap !== undefined) ? args.snap : defaults.touchSnap;
-		result.floatOrigin = args && (args.floatOrigin !== undefined) ? args.floatOrigin : defaults.touchFloatOrigin;
-		result.allowScrolling = args && (args.allowScrolling !== undefined) ? args.allowScrolling : defaults.touchAllowScrolling;
+		result.snap = args && args.snap !== undefined ? args.snap : defaults.touchSnap;
+		result.floatOrigin = args && args.floatOrigin !== undefined ? args.floatOrigin : defaults.touchFloatOrigin;
+		result.allowScrolling = args && args.allowScrolling !== undefined ? args.allowScrolling : defaults.touchAllowScrolling;
 
 		function touchHandler(e) {
 			if (result.snap && (e.event.type === 'touchend' || e.event.type === 'touchcancel')) {
