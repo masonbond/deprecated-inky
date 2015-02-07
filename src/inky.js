@@ -27,14 +27,11 @@ var defaults = {
 	touchAllowScrolling: false
 };
 
-// TODO refactor TouchArea to use Device
-// TODO refactor Gamepad to use Device
-// TODO refactor Keyboard to use Device
-// TODO refactor Mouse to use Device
 // TODO have manhattan/euclidean scalings for gamepad analogs?
-// TODO deadZone behavior update for COORD_X and COORD_Y
-// TODO function as move arg type
-// TODO PRESSURE press and release (move will have to wait?)
+// TODO deadZone behavior update for TouchArea.SLIDER_X and Y
+// TODO allow function as move arg type
+// TODO PRESSURE press and release fallback when touch force is undefined
+//		- base pressure off of touch radius when available?
 // TODO orientation
 
 // static privates
@@ -770,8 +767,8 @@ var pi = {
 				touchcancel: touchListener
 			},
 			components: {
-				COORD_X: 'Coord X',
-				COORD_Y: 'Coord Y',
+				SLIDER_X: 'Slider X',
+				SLIDER_Y: 'Slider Y',
 				MANHATTAN_X: 'Manhattan X',
 				MANHATTAN_Y: 'Manhattan Y',
 				RADIAL_X: 'Radial X',
@@ -793,7 +790,7 @@ var pi = {
 		function touchHandler(e) {
 			if (result.snap && (e.event.type === 'touchend' || e.event.type === 'touchcancel')) {
 				e.values.PRESSURE = 0;
-				e.values.COORD_X = e.values.COORD_Y = 0;
+				e.values.SLIDER_X = e.values.SLIDER_Y = 0;
 				e.values.MANHATTAN_X = e.values.MANHATTAN_Y = 0;
 				e.values.RADIAL_X = e.values.RADIAL_Y = 0;
 			} else {
@@ -807,8 +804,8 @@ var pi = {
 				var y =  (touch.clientY - rect.top) / rect.height;
 
 				e.values.PRESSURE = touch.force;
-				e.values.COORD_X = Math.min(1, Math.max(0, x));
-				e.values.COORD_Y = Math.min(1, Math.max(0, y));
+				e.values.SLIDER_X = Math.min(1, Math.max(0, x));
+				e.values.SLIDER_Y = Math.min(1, Math.max(0, y));
 
 				var rx = x + x - 1;
 				var ry = y + y - 1;
