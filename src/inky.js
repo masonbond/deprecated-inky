@@ -30,9 +30,10 @@ var defaults = {
 // TODO have manhattan/euclidean scalings for gamepad analogs?
 // TODO deadZone behavior update for TouchArea.SLIDER_X and Y
 // TODO allow function as move arg type
-// TODO PRESSURE press and release fallback when touch force is undefined
-//		- base pressure off of touch radius when available?
 // TODO orientation
+// TODO multitouch audit/necessary fixes
+// TODO onError callback for pointer lock requests
+
 
 // static privates
 
@@ -200,7 +201,6 @@ function pointerLockChange(e) {
 }
 
 function pointerLockError(e) {
-	// TODO onError callback for pointer lock requests
 	console.log("POINTER ERROR", e);
 }
 
@@ -798,7 +798,6 @@ var pi = {
 				var xCenter = (rect.left + rect.right) / 2;
 				var yCenter = (rect.top + rect.bottom) / 2;
 
-				// TODO for (var i = 0, touch; touch = e.changedTouches[i]; ++i) if (touch.target === element) {
 				var touch = e.event.targetTouches[e.event.targetTouches.length - 1];
 				var x = (touch.clientX - rect.left) / rect.width;
 				var y =  (touch.clientY - rect.top) / rect.height;
