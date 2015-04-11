@@ -122,12 +122,18 @@ function beforeRelease(event, component, duration) {
 function beforeMove(event, component, args) {
 	var b = event.binding;
 	if (b.moveArgs && component !== pi.MOUSE_MOVE) {
-		var v = args.v, d = args.dv;
-
 		for (var arg in b.moveArgs) {
-			var scale = b.moveArgs[arg];
-			args[arg] = v * scale;
-			args["d" + arg] = d * scale;
+			var transform = b.moveArgs[arg];
+
+			if (typeof transform === 'function') {
+				// transform is a custom function
+				var old = args[arg] || 0;
+				args["d" + arg] = (args[arg] = transform(args.v)) - old;
+			} else if (typeof transform === 'number') {
+				// transform is a scaling value
+				args[arg] = args.v * transform;
+				args["d" + arg] = args.dv * transform;
+			}
 		}
 	}
 

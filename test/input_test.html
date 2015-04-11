@@ -116,7 +116,7 @@ function poop(e){
 	else if (e.component === smear.PRESSURE) e.target.p = e.move.v;
 
 	smearCap.innerHTML = e.type + "<br>X: " + e.target.x + "<br>Y: " + e.target.y + "<br>pressure: " + e.target.p;
-	console.log(e.component, smearCap.innerHTML);
+	console.log(e.component, e.move, smearCap.innerHTML);
 
 	var rect = smearElement.getBoundingClientRect();
 	smearCap.style.top = (e.target.y * (rect.bottom - rect.top) / 2) + 'px';
@@ -130,7 +130,7 @@ var c = new IN.Control({
 
 var binding = input.bind({
 	control: c,
-	moveArgs: {butt: 1},
+	moveArgs: { butt: function(v) { return Math.floor(v * 100); } },
 	target: {
 		x: 0,
 		y: 0
@@ -148,11 +148,6 @@ var binding2 = input2.bind({
 });//*/
      
 console.log("binding2", binding2, c);
-
-setTimeout(function(){
-	binding.moveArgs = {poop: 1};
-}, 5000);
-
 
 testElement.addEventListener("click", function(e) {
 	input.requestPointerLock(function(e) {
