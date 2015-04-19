@@ -20,16 +20,21 @@ var defaults = {
 	deviceDeadZone: 0,
 	deviceThreshold: 0,
 	deviceCapture: false,
+	deviceNormalized: true,
+	deviceComponentNormalized: true,
 	touchDeadZone: .1,
 	touchThreshold: .01,
 	touchSnap: true,
 	touchFloatOrigin: true,
-	touchAllowScrolling: false
+	touchAllowScrolling: false,
+	touchNormalized: true,
+	gamepadNormalized: true
 };
 
-// TODO have manhattan/euclidean scalings for gamepad analogs?
-// TODO allow function as move arg type
+// TODO have manhattan/radial scalings for gamepad analogs?
+// TODO make TouchArea.normalize code generic for gamepad
 // TODO orientation
+// TODO mouse move custom args
 // TODO multitouch audit/necessary fixes
 // TODO onError callback for pointer lock requests
 
@@ -525,7 +530,6 @@ var pi = {
 			return false;
 		}
 
-
 		function dragStart(e) {
 			if (result.allowDrag) return true;
 			e.preventDefault();
@@ -585,6 +589,7 @@ var pi = {
 			pollRate: oldPollRate,
 			analogDeadZone: Math.max(0.00001, args && args.analogDeadZone !== undefined ? args.analogDeadZone : defaults.analogDeadZone),
 			analogThreshold: args && args.analogThreshold !== undefined ? args.analogThreshold : defaults.analogThreshold,
+			analogNormalized: args && args.analogNormalized !== undefined ? args.analogNormalized : defaults.analogNormalized,
 			allowContextMenu: args && args.allowContextMenu !== undefined ? args.allowContextMenu : defaults.allowContextMenu,
 			allowMiddleMouseScroll: args && args.allowMiddleMouseScroll !== undefined ? args.allowMiddleMouseScroll : defaults.allowMiddleMouseScroll,
 			allowSelect: args && args.allowSelect !== undefined ? args.allowSelect : defaults.allowSelect,
@@ -674,16 +679,18 @@ var pi = {
 	},
 	Device: function(args) {
 		var newValues = {},
+			components = args && typeof args.components === 'object' ? args.components : {COMPONENT: 'Component'},
+			componentSettings = {},
 			result = {
-				enabled: args && args.enabled !== undefined && args.enabled || defaults.deviceEnabled,
+				enabled: args && args.enabled !== undefined ? args.enabled : defaults.deviceEnabled,
+				normalized: args && args.normalized !== undefined ? args.normalized : defaults.deviceNormalized,
 				id: userDeviceId,
 				events: args && args.events || {},
-				pollRate: args && args.pollRate !== undefined && args.pollrate || defaults.devicePollRate,
+				pollRate: args && args.pollRate !== undefined ? args.pollrate : defaults.devicePollRate,
 				poll: args && args.poll || undefined,
-				DEVICE: args && args.name !== undefined && args.name || ('User-Defined Device ' + userDeviceId),
-				components: args && typeof args.components === 'object' && args.components || {COMPONENT: 'Component'},
-				deadZone: Math.max(0.00001, args && args.deadZone !== undefined && args.deadZone || defaults.deviceDeadZone),
-				threshold: args && args.threshold !== undefined && args.threshold || defaults.deviceThreshold,
+				DEVICE: args && args.name !== undefined ? args.name : ('User-Defined Device ' + userDeviceId),
+				deadZone: Math.max(0.00001, args && args.deadZone !== undefined ? args.deadZone : defaults.deviceDeadZone),
+				threshold: args && args.threshold !== undefined ? args.threshold : defaults.deviceThreshold
 			},
 			eventContext = {
 				values: newValues,
@@ -696,24 +703,44 @@ var pi = {
 		// helpers
 
 		function raiseEvents() {
-			if (!result.enabled) return;
+			if (!result.enabled || result.deadZone >= 1) return;
 
 			for (var c in newValues) {
 				var component = result[c],
+					componentNormalized = componentSettings[component].normalized,
 					old = pi.async[component],
 					cur = newValues[c],
-					diff = cur - old;
+					diff = cur - old,
+					v,
+					dv,
+					range;
 
 				if (result.threshold === 0 || Math.abs(diff) >= result.threshold) {
-					if (Math.abs(cur) >= result.deadZone) {
-						if (Math.abs(old) < result.deadZone) pi.press(component);
-						pi.move(component, {v: cur, dv: diff});
-					} else {
-						cur = 0;
-						diff = -old;
+					range = 1 - result.deadZone;
 
-						if (Math.abs(old) >= result.deadZone) {
-							pi.move(component, {v: cur, dv: diff});
+					if (Math.abs(cur) >= result.deadZone || (result.normalized && !componentNormalized)) {
+						if (Math.abs(old) < result.deadZone) pi.press(component);
+
+						v = cur;
+						dv = diff;
+
+						if (result.normalized && componentNormalized) {
+							range = 1 - result.deadZone;
+							v = cur > 0 ? Math.max(0, (cur - result.deadZone) / range) : Math.min(0, (cur + result.deadZone) / range);
+							dv = v - (old > 0 ? Math.max(0, (old - result.deadZone) / range) : Math.min(0, (old + result.deadZone) / range));
+						}
+
+						pi.move(component, {v: v, dv: dv});
+					} else {
+						cur = v = 0;
+						dv = diff = -old;
+
+						if (result.normalized && componentNormalized) {
+							dv = -(old > 0 ? Math.max(0, (old - result.deadZone) / range) : Math.min(0, (old + result.deadZone) / range));	
+						}
+
+						if (Math.abs(old) >= result.deadZone || (result.normalized && !componentNormalized)) {
+							pi.move(component, {v: v, dv: dv});
 							pi.release(component);
 						}
 					}
@@ -724,11 +751,18 @@ var pi = {
 			}
 		}
 
-		// add component codes to stuff
-		for (var c in result.components) {
-			result[c] = result.DEVICE + ' ' + result.components[c];
-			componentToDevice[result[c]] = result.DEVICE;
-			newValues[c] = pi.async[result[c]] = 0;
+		// add component codes and settings to stuff
+		for (var c in components) {
+			var componentName = typeof components[c] === 'object' ? components[c].name : components[c];
+
+			componentName = result[c] = result.DEVICE + ' ' + componentName;
+			
+			componentSettings[componentName] = {
+				normalized: components[c].normalized !== undefined ? components[c].normalized : defaults.deviceComponentNormalized
+			}
+
+			componentToDevice[componentName] = result.DEVICE;
+			newValues[c] = pi.async[componentName] = 0;
 		}
 
 		// listen for events
@@ -764,6 +798,9 @@ var pi = {
 		// construct device
 		var result = new IN.Device({
 			name: args && args.name,
+			deadZone: args && typeof args.deadZone !== 'undefined' ? args.deadZone : defaults.touchDeadZone,
+			threshold: args && typeof args.threshold !== 'undefined' ? args.threshold : defaults.touchThreshold,
+			normalized: args && typeof args.normalized !== 'undefined' ? args.normalized : defaults.touchNormalized,
 			events: {
 				touchstart: touchListener,
 				touchmove: touchListener,
@@ -776,8 +813,14 @@ var pi = {
 				SLIDER_Y: 'Slider Y',
 				MANHATTAN_X: 'Manhattan X',
 				MANHATTAN_Y: 'Manhattan Y',
-				RADIAL_X: 'Radial X',
-				RADIAL_Y: 'Radial Y',
+				RADIAL_X: {
+					name: 'Radial X',
+					normalized: false
+				},
+				RADIAL_Y: {
+					name: 'Radial Y',
+					normalized: false
+				},
 				PRESSURE: 'Pressure'
 			},
 			init: function(e) {
@@ -807,6 +850,8 @@ var pi = {
 				var x = (touch.clientX - rect.left) / rect.width;
 				var y =  (touch.clientY - rect.top) / rect.height;
 
+				var range = 1 - result.deadZone;
+
 				e.values.PRESSURE = touch.force;
 				e.values.SLIDER_X = Math.min(1, Math.max(0, x));
 				e.values.SLIDER_Y = Math.min(1, Math.max(0, y));
@@ -830,13 +875,31 @@ var pi = {
 				e.values.MANHATTAN_Y = Math.min(1, Math.max(-1, ry));
 
 				// maximum vector length (from center) of 1
-				var d = rx * rx + ry * ry;
+				var d = Math.sqrt(rx * rx + ry * ry),
+					scale = d <= 1 ? 1 : 1 / d;
 
-				if (d <= 1) d = 1;
-				else d = 1 / Math.sqrt(d);
+				e.values.RADIAL_X = rx * scale;
+				e.values.RADIAL_Y = ry * scale;
 
-				e.values.RADIAL_X = rx * d;
-				e.values.RADIAL_Y = ry * d;
+				if (result.normalized) {
+					// manual normalization for RADIAL_X and Y, since they 
+					// must be normalized relative to each other
+
+					var sin = Math.abs(ry / d),
+						cos = Math.abs(rx / d),
+						xNorm = cos > 0 ? Math.min(1, e.values.RADIAL_X / cos) : 0,
+						yNorm = sin > 0 ? Math.min(1, e.values.RADIAL_Y / sin) : 0;
+
+					d = Math.min(1, d);
+
+					console.log(d, e.values.RADIAL_X, e.values.RADIAL_Y);
+
+					e.values.RADIAL_X = cos * (xNorm > 0 ? Math.max(0, (xNorm - result.deadZone) / range) : Math.min(0, (xNorm + result.deadZone) / range));
+					e.values.RADIAL_Y = sin * (yNorm > 0 ? Math.max(0, (yNorm - result.deadZone) / range) : Math.min(0, (yNorm + result.deadZone) / range));
+				}
+
+				if (Math.abs(e.values.RADIAL_X) <= result.deadZone && Math.abs(e.values.RADIAL_Y) >= 1 - result.deadZone * result.deadZone) e.values.RADIAL_Y = e.values.RADIAL_Y > 0 ? 1 : -1;
+				if (Math.abs(e.values.RADIAL_Y) <= result.deadZone && Math.abs(e.values.RADIAL_X) >= 1 - result.deadZone * result.deadZone) e.values.RADIAL_X = e.values.RADIAL_X > 0 ? 1 : -1;
 			}
 
 			if (!result.allowScrolling) UTILS.killEvent(e.event);

@@ -28,8 +28,8 @@ body {
 #smear {
 background: #222;
 border-radius: 50%;
-width: 200px;
-height: 200px;
+width: 400px;
+height: 400px;
 }
 
 .test .stick-cap {
@@ -84,8 +84,9 @@ var smear = new IN.TouchArea({
 	element: smearElement,
 	floatOrigin: true,
 	snap: true,
-	deadZone: 0,
-	threshold: 0.00001
+	deadZone: 0.25,
+	threshold: 0.00001,
+	normalized: true
 });
 
 var smearCap = smearElement.childNodes[0];
