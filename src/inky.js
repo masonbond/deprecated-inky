@@ -13,8 +13,9 @@ var defaults = {
 	allowDrag: false,
 	allowFocusOnHover: true,
 	allowDefaultKeyboardEvents: false,
-	analogDeadZone: .2,
+	analogDeadZone: .1,
 	analogThreshold: .01,
+	analogNormalized: true,
 	deviceEnabled: true,
 	devicePollRate: 33,
 	deviceDeadZone: 0,
@@ -27,16 +28,14 @@ var defaults = {
 	touchSnap: true,
 	touchFloatOrigin: true,
 	touchAllowScrolling: false,
-	touchNormalized: true,
-	gamepadNormalized: true
+	touchNormalized: true
 };
 
-// TODO have manhattan/radial scalings for gamepad analogs?
-// TODO make TouchArea.normalize code generic for gamepad
 // TODO orientation
 // TODO mouse move custom args
 // TODO multitouch audit/necessary fixes
 // TODO onError callback for pointer lock requests
+// TODO way to select radial when rebinding
 
 
 // static privates
@@ -172,10 +171,7 @@ function normalize2DComponents(values, xName, yName, a, o, h, deadZone) {
 		cos = Math.abs(a / h),
 		xNorm = cos > 0 ? Math.min(1, values[xName] / cos) : 0,
 		yNorm = sin > 0 ? Math.min(1, values[yName] / sin) : 0,
-		d = Math.min(1, h),
 		range = 1 - deadZone;
-
-	console.log(d, values[xName], values[yName]);
 
 	values[xName] = cos * (xNorm > 0 ? Math.max(0, (xNorm - deadZone) / range) : Math.min(0, (xNorm + deadZone) / range));
 	values[yName] = sin * (yNorm > 0 ? Math.max(0, (yNorm - deadZone) / range) : Math.min(0, (yNorm + deadZone) / range));
@@ -290,6 +286,8 @@ var pi = {
 		var oldPollRate = args && args.pollRate !== undefined ? args.pollRate : defaults.pollRate;
 		var pollInterval = setInterval(autoPoll, oldPollRate);
 		var pads = [];
+		var derived = [0, 0, 0, 0];
+		var oldDerived = [0, 0, 0, 0];
 		var oldMX = undefined, oldMY = undefined;
 
 		var rebindTarget = {
@@ -352,7 +350,13 @@ var pi = {
 				for (var i = 0; i < maxPads; ++i) {
 					var cur = newPads[i];
 					if (cur) {
-						var old = pads[i] = {id:cur.id, timestamp:cur.timestamp, axes:[], buttons:[]};
+						var old = pads[i] = {
+							id: cur.id,
+							timestamp: cur.timestamp,
+							axes: [],
+							buttons: []
+						};
+
 						for (var j = 0; cur.axes[j] !== undefined && j < maxAxes; ++j) {
 							old.axes[j] = cur.axes[j];
 						}
@@ -373,51 +377,89 @@ var pi = {
 
 				if (!cur || (cur.timestamp !== undefined && cur.timestamp === old.timestamp)) continue;
 
-				var curAxes = [], oldAxes = [], curButtons = [], oldButtons = [];
-
 				old.timestamp = cur.timestamp;
 
-				raiseComponentEvents(cur.axes, old.axes, axisCodes, i);
-				raiseComponentEvents(cur.buttons, old.buttons, buttonCodes, i);
+				raiseComponentEvents(cur.axes, old.axes, axisCodes, i, false);
+				raiseComponentEvents(cur.buttons, old.buttons, buttonCodes, i, false);
+
+				// raise events on derived component types
+
+				var lx = cur.axes[0];
+				var ly = cur.axes[1];
+				var rx = cur.axes[2];
+				var ry = cur.axes[3];
+
+				var dl = Math.sqrt(lx * lx + ly * ly);
+				var dr = Math.sqrt(rx * rx + ry * ry);
+				var sl = dl < 1 ? 1 : 1 / dl;
+				var sr = dr < 1 ? 1 : 1 / dr;
+
+				derived[0] = lx * sl;
+				derived[1] = ly * sl;
+				derived[2] = rx * sr;
+				derived[3] = ry * sr;
+
+				if (result.analogNormalized) {
+					normalize2DComponents(derived, 0, 1, lx, ly, dl, result.analogDeadZone);
+					normalize2DComponents(derived, 2, 3, rx, ry, dr, result.analogDeadZone);
+				}
+
+				if (Math.abs(derived[0]) <= result.analogDeadZone && Math.abs(derived[1]) >= 1 - result.analogDeadZone * result.analogDeadZone) derived[1] = derived[1] > 0 ? 1 : -1;
+				if (Math.abs(derived[1]) <= result.analogDeadZone && Math.abs(derived[0]) >= 1 - result.analogDeadZone * result.analogDeadZone) derived[0] = derived[0] > 0 ? 1 : -1;
+				if (Math.abs(derived[2]) <= result.analogDeadZone && Math.abs(derived[3]) >= 1 - result.analogDeadZone * result.analogDeadZone) derived[3] = derived[3] > 0 ? 1 : -1;
+				if (Math.abs(derived[3]) <= result.analogDeadZone && Math.abs(derived[2]) >= 1 - result.analogDeadZone * result.analogDeadZone) derived[2] = derived[2] > 0 ? 1 : -1;
+
+				raiseComponentEvents(derived, oldDerived, derivedCodes, i, true);
 			}
 		}
 
-		function raiseComponentEvents(curList, oldList, codes, deviceIndex) {
+		function raiseComponentEvents(curList, oldList, codes, deviceIndex, isDerived) {
 			for (var i = 0, l = curList.length; i < l; ++i) {
 				var code = codes[i];
+				var componentNormalized = !isDerived;
+				var alreadyNormalized = result.analogNormalized && !componentNormalized;
 				var cur = curList[i].value === undefined ? curList[i] : curList[i].value;
-				var curRaw = cur;  // before dead zone transformation
 				var old = oldList[i];
 				var diff = cur - old;
+				var v = cur;
+				var dv = diff;
+				var range = 1 - result.analogDeadZone;
 
 				if (Math.abs(diff) >= result.analogThreshold) {
-					var padIndexComponent = "Gamepad " + deviceIndex + " " + code;
+					var padIndexComponent = pi.GAMEPAD + " " + deviceIndex + " " + code;
 
-					if (Math.abs(cur) >= result.analogDeadZone) {
-						cur = (cur > 0 ? (cur - result.analogDeadZone) : (cur + result.analogDeadZone)) / (1 - result.analogDeadZone);
-						pi.async[padIndexComponent] = cur;
+					if (Math.abs(cur) > (alreadyNormalized ? 0 : result.analogDeadZone)) {
+						if (result.analogNormalized && componentNormalized) {
+							v = cur > 0 ? Math.max(0, (cur - result.analogDeadZone) / range) : Math.min(0, (cur + result.analogDeadZone) / range);
+							dv = v - (old > 0 ? Math.max(0, (old - result.analogDeadZone) / range) : Math.min(0, (old + result.analogDeadZone) / range));
+						}
 
-						if (Math.abs(old) < result.analogDeadZone && isFocused()) {
+						pi.async[code] = pi.async[padIndexComponent] = cur;
+
+						if ((Math.abs(old) < (alreadyNormalized ? result.analogThreshold : result.analogDeadZone)) && isFocused()) {
 							result.press(code);
 							result.press(padIndexComponent);
 						}
 
-						old = ((old > 0 && old - result.analogDeadZone) || (old < 0 && old + result.analogDeadZone) || 0) / (1 - result.analogDeadZone);
-						result.move(code, {v:cur,dv:cur-old});
-						result.move(padIndexComponent, {v:cur,dv:cur-old});
+						result.move(code, {v: v, dv: dv});
+						result.move(padIndexComponent, {v: v, dv: dv});
 					} else {
-						cur = pi.async[padIndexComponent] = 0;
+						v = cur = pi.async[code] = pi.async[padIndexComponent] = 0;
+						dv = diff = -old;
 
 						if (Math.abs(old) > 0) {
-							old = ((old > 0 && old - result.analogDeadZone) || (old < 0 && old + result.analogDeadZone) || 0) / (1 - result.analogDeadZone);
-							result.move(code, {v:0,dv:-old});
-							result.move(padIndexComponent, {v:0,dv:-old});
+							if (result.analogNormalized && componentNormalized) {
+								dv = -(old > 0 ? Math.max(0, (old - result.analogDeadZone) / range) : Math.min(0, (old + result.analogDeadZone) / range));	
+							}
+
+							result.move(code, {v: v, dv: dv});
+							result.move(padIndexComponent, {v: v, dv: dv});
 							result.release(code);
 							result.release(padIndexComponent);
 						}
 					}
 
-					oldList[i] = curRaw;
+					oldList[i] = cur;
 				}
 			}
 		}
@@ -722,6 +764,7 @@ var pi = {
 			for (var c in newValues) {
 				var component = result[c],
 					componentNormalized = componentSettings[component].normalized,
+					alreadyNormalized = result.normalized && !componentNormalized,
 					old = pi.async[component],
 					cur = newValues[c],
 					diff = cur - old,
@@ -729,11 +772,11 @@ var pi = {
 					dv,
 					range;
 
-				if (result.threshold === 0 || Math.abs(diff) >= result.threshold) {
+				if (Math.abs(diff) >= result.threshold) {
 					range = 1 - result.deadZone;
 
-					if (Math.abs(cur) >= result.deadZone || (result.normalized && !componentNormalized)) {
-						if (Math.abs(old) < result.deadZone) pi.press(component);
+					if (Math.abs(cur) > (alreadyNormalized ? 0 : result.deadZone)) {
+						if (Math.abs(old) < (alreadyNormalized ? result.threshold : result.deadZone)) pi.press(component);
 
 						v = cur;
 						dv = diff;
@@ -749,11 +792,11 @@ var pi = {
 						cur = v = 0;
 						dv = diff = -old;
 
-						if (result.normalized && componentNormalized) {
-							dv = -(old > 0 ? Math.max(0, (old - result.deadZone) / range) : Math.min(0, (old + result.deadZone) / range));	
-						}
+						if (Math.abs(old) >= 0) {
+							if (result.normalized && componentNormalized) {
+								dv = -(old > 0 ? Math.max(0, (old - result.deadZone) / range) : Math.min(0, (old + result.deadZone) / range));	
+							}
 
-						if (Math.abs(old) >= result.deadZone || (result.normalized && !componentNormalized)) {
 							pi.move(component, {v: v, dv: dv});
 							pi.release(component);
 						}
@@ -896,7 +939,6 @@ var pi = {
 				if (result.normalized) {
 					// manual normalization for RADIAL_X and Y, since they 
 					// must be normalized relative to each other
-
 					normalize2DComponents(e.values, 'RADIAL_X', 'RADIAL_Y', rx, ry, d, result.deadZone);
 				}
 
@@ -968,6 +1010,11 @@ var components = {
 	GAMEPAD_BUTTON_29: "Button 29",
 	GAMEPAD_BUTTON_30: "Button 30",
 	GAMEPAD_BUTTON_31: "Button 31",
+
+	GAMEPAD_LEFT_STICK_RADIAL_X: "Left Stick Radial X",
+	GAMEPAD_LEFT_STICK_RADIAL_Y: "Left Stick Radial Y",
+	GAMEPAD_RIGHT_STICK_RADIAL_X: "Right Stick Radial X",
+	GAMEPAD_RIGHT_STICK_RADIAL_Y: "Right Stick Radial Y",
 
 	// mouse
 
@@ -1096,6 +1143,11 @@ for (var i = 0, l = 4; i < l; ++i) {
 	components[gamepadCode + "_BUTTON_29"] = components[gamepadCode] + " " + components.GAMEPAD_BUTTON_29;
 	components[gamepadCode + "_BUTTON_30"] = components[gamepadCode] + " " + components.GAMEPAD_BUTTON_30;
 	components[gamepadCode + "_BUTTON_31"] = components[gamepadCode] + " " + components.GAMEPAD_BUTTON_31;
+
+	components[gamepadCode + "_LEFT_STICK_RADIAL_X"] = components[gamepadCode] + " " + components.GAMEPAD_LEFT_STICK_RADIAL_X;
+	components[gamepadCode + "_LEFT_STICK_RADIAL_Y"] = components[gamepadCode] + " " + components.GAMEPAD_LEFT_STICK_RADIAL_Y;
+	components[gamepadCode + "_RIGHT_STICK_RADIAL_X"] = components[gamepadCode] + " " + components.GAMEPAD_RIGHT_STICK_RADIAL_X;
+	components[gamepadCode + "_RIGHT_STICK_RADIAL_Y"] = components[gamepadCode] + " " + components.GAMEPAD_RIGHT_STICK_RADIAL_Y;
 }
 
 var componentToDevice = {};
@@ -1298,6 +1350,13 @@ var buttonCodes = [
 	pi.GAMEPAD_BUTTON_29,
 	pi.GAMEPAD_BUTTON_30,
 	pi.GAMEPAD_BUTTON_31
+];
+
+var derivedCodes = [
+	pi.GAMEPAD_LEFT_STICK_RADIAL_X,
+	pi.GAMEPAD_LEFT_STICK_RADIAL_Y,
+	pi.GAMEPAD_RIGHT_STICK_RADIAL_X,
+	pi.GAMEPAD_RIGHT_STICK_RADIAL_Y
 ];
 
 return pi;

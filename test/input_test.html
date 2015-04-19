@@ -33,7 +33,7 @@ height: 400px;
 }
 
 .test .stick-cap {
-	color: #000;
+	color: #f00;
 	background: #fff;
 	border-radius: 50%;
 	width: 60%;
@@ -67,16 +67,13 @@ var testElement = document.getElementById("test");
 var testElement2 = document.getElementById("test2");
 var smearElement = document.getElementById('smear');
 
-var input = new IN.Dispatcher({
-	element: testElement,
-	pollRate: 50
-});
-
 var input2 = new IN.Dispatcher({
 	element: testElement2,
 	pollRate: 40, 
 	allowDefaultKeyboardEvents: true,
-	allowFocusOnHover: true
+	allowFocusOnHover: true,
+	analogDeadZone: 0.25,
+	analogNormalized: true
 });
 
 var smear = new IN.TouchArea({
@@ -107,7 +104,7 @@ var c2 = new IN.Control({
 		console.log(e);
 	},
 	move: function(e){
-		console.log("2 MVOE!!!!!!!!!", e.move);
+		console.log("2 MVOE!!!!!!!!!", e.component, e.move);
 	}
 });
 
@@ -125,28 +122,30 @@ function poop(e){
 }
 
 var c = new IN.Control({
-	move: poop
-});
-
-
-var binding = input.bind({
-	control: c,
-	moveArgs: { butt: function(v) { return Math.floor(v * 100); } },
-	target: {
-		x: 0,
-		y: 0
+	move: poop,
+	press: function() {
+		console.log(">>> Press POOP");
 	},
-	component: [IN.KEY_SPACE, IN.MOUSE_LEFT_BUTTON, IN.MOUSE_MOVE, IN.GAMEPAD_LEFT_STICK_X, smear.RADIAL_X, smear.RADIAL_Y, smear.MANHATTAN_X, smear.MANHATTAN_Y, smear.PRESSURE]
+	release: function() {
+		console.log(">>> Release POOP");
+	}
 });
 
-console.log("binding", binding);
+var binding = input2.bind({
+	control: c,
+	target: { x: 0, y: 0 },
+	component: [smear.RADIAL_X, smear.RADIAL_Y]
+});
 
 var binding2 = input2.bind({
 	control: c2,
 	target: t2,
 	moveArgs: {x: -1},  
-	component: [IN.KEY_SPACE, IN.GAMEPAD_0_BUTTON_0, IN.GAMEPAD_LEFT_TRIGGER, IN.MOUSE_LEFT_BUTTON, IN.GAMEPAD_LEFT_STICK_X]
+	component: [IN.KEY_SPACE, IN.GAMEPAD_0_BUTTON_0, IN.GAMEPAD_LEFT_TRIGGER, IN.MOUSE_LEFT_BUTTON, IN.GAMEPAD_LEFT_STICK_RADIAL_X, IN.GAMEPAD_LEFT_STICK_RADIAL_Y]
+	//component: [IN.KEY_SPACE, IN.GAMEPAD_0_BUTTON_0, IN.GAMEPAD_LEFT_TRIGGER, IN.MOUSE_LEFT_BUTTON, IN.GAMEPAD_LEFT_STICK_X, IN.GAMEPAD_LEFT_STICK_Y]
 });//*/
+
+
      
 console.log("binding2", binding2, c);
 
