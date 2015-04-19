@@ -404,11 +404,6 @@ var pi = {
 					normalize2DComponents(derived, 2, 3, rx, ry, dr, result.analogDeadZone);
 				}
 
-				if (Math.abs(derived[0]) <= result.analogDeadZone && Math.abs(derived[1]) >= 1 - result.analogDeadZone * result.analogDeadZone) derived[1] = derived[1] > 0 ? 1 : -1;
-				if (Math.abs(derived[1]) <= result.analogDeadZone && Math.abs(derived[0]) >= 1 - result.analogDeadZone * result.analogDeadZone) derived[0] = derived[0] > 0 ? 1 : -1;
-				if (Math.abs(derived[2]) <= result.analogDeadZone && Math.abs(derived[3]) >= 1 - result.analogDeadZone * result.analogDeadZone) derived[3] = derived[3] > 0 ? 1 : -1;
-				if (Math.abs(derived[3]) <= result.analogDeadZone && Math.abs(derived[2]) >= 1 - result.analogDeadZone * result.analogDeadZone) derived[2] = derived[2] > 0 ? 1 : -1;
-
 				raiseComponentEvents(derived, oldDerived, derivedCodes, i, true);
 			}
 		}
@@ -941,9 +936,6 @@ var pi = {
 					// must be normalized relative to each other
 					normalize2DComponents(e.values, 'RADIAL_X', 'RADIAL_Y', rx, ry, d, result.deadZone);
 				}
-
-				if (Math.abs(e.values.RADIAL_X) <= result.deadZone && Math.abs(e.values.RADIAL_Y) >= 1 - result.deadZone * result.deadZone) e.values.RADIAL_Y = e.values.RADIAL_Y > 0 ? 1 : -1;
-				if (Math.abs(e.values.RADIAL_Y) <= result.deadZone && Math.abs(e.values.RADIAL_X) >= 1 - result.deadZone * result.deadZone) e.values.RADIAL_X = e.values.RADIAL_X > 0 ? 1 : -1;
 			}
 
 			if (!result.allowScrolling) UTILS.killEvent(e.event);
