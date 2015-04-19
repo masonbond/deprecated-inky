@@ -167,6 +167,20 @@ function raiseEvents(dispatcher, listeners, event, component, time, arg2) {
 	}
 }
 
+function normalize2DComponents(values, xName, yName, a, o, h, deadZone) {
+	var sin = Math.abs(o / h),
+		cos = Math.abs(a / h),
+		xNorm = cos > 0 ? Math.min(1, values[xName] / cos) : 0,
+		yNorm = sin > 0 ? Math.min(1, values[yName] / sin) : 0,
+		d = Math.min(1, h),
+		range = 1 - deadZone;
+
+	console.log(d, values[xName], values[yName]);
+
+	values[xName] = cos * (xNorm > 0 ? Math.max(0, (xNorm - deadZone) / range) : Math.min(0, (xNorm + deadZone) / range));
+	values[yName] = sin * (yNorm > 0 ? Math.max(0, (yNorm - deadZone) / range) : Math.min(0, (yNorm + deadZone) / range));
+}
+
 // top-level callbacks and properties
 var pointerLockElement;
 var onEnterPointerLock;
@@ -850,8 +864,6 @@ var pi = {
 				var x = (touch.clientX - rect.left) / rect.width;
 				var y =  (touch.clientY - rect.top) / rect.height;
 
-				var range = 1 - result.deadZone;
-
 				e.values.PRESSURE = touch.force;
 				e.values.SLIDER_X = Math.min(1, Math.max(0, x));
 				e.values.SLIDER_Y = Math.min(1, Math.max(0, y));
@@ -885,17 +897,7 @@ var pi = {
 					// manual normalization for RADIAL_X and Y, since they 
 					// must be normalized relative to each other
 
-					var sin = Math.abs(ry / d),
-						cos = Math.abs(rx / d),
-						xNorm = cos > 0 ? Math.min(1, e.values.RADIAL_X / cos) : 0,
-						yNorm = sin > 0 ? Math.min(1, e.values.RADIAL_Y / sin) : 0;
-
-					d = Math.min(1, d);
-
-					console.log(d, e.values.RADIAL_X, e.values.RADIAL_Y);
-
-					e.values.RADIAL_X = cos * (xNorm > 0 ? Math.max(0, (xNorm - result.deadZone) / range) : Math.min(0, (xNorm + result.deadZone) / range));
-					e.values.RADIAL_Y = sin * (yNorm > 0 ? Math.max(0, (yNorm - result.deadZone) / range) : Math.min(0, (yNorm + result.deadZone) / range));
+					normalize2DComponents(e.values, 'RADIAL_X', 'RADIAL_Y', rx, ry, d, result.deadZone);
 				}
 
 				if (Math.abs(e.values.RADIAL_X) <= result.deadZone && Math.abs(e.values.RADIAL_Y) >= 1 - result.deadZone * result.deadZone) e.values.RADIAL_Y = e.values.RADIAL_Y > 0 ? 1 : -1;
