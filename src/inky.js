@@ -526,8 +526,8 @@ var pi = {
 				yOld = pi.async[pi.MOTION_ORIENTATION_Y] - calibration.orientation[1],
 				zOld = pi.async[pi.MOTION_ORIENTATION_Z] - calibration.orientation[2],
 				dx = x - xOld,
-				dy = y - xOld,
-				dz = z - xOld,
+				dy = y - yOld,
+				dz = z - zOld,
 				vxOld = oldOrientationVector[0],
 				vyOld = oldOrientationVector[1],
 				vzOld = oldOrientationVector[2],
@@ -542,7 +542,7 @@ var pi = {
 			// measure of angle between this and last x/y orientation
 			angleDiff = Math.acos(Math.min(1, vx * vxOld + vy * vyOld + vz * vzOld));
 
-			if (angleDiff > result.orientationThreshold) {
+			if (angleDiff > result.orientationXYThreshold) {
 				var vxNeutral = Math.cos(calibration.orientation[1]),
 					vyNeutral = Math.sin(calibration.orientation[0]),
 					vzNeutral = Math.sin(calibration.orientation[1]),
@@ -558,9 +558,9 @@ var pi = {
 				angleFromCenter = Math.acos(Math.min(1, vx * vxNeutral + vy * vyNeutral + vz * vzNeutral));
 
 				if (angleFromCenter > result.orientationXYDeadZone) {
-					if (Math.abs(xOld) + Math.abs(yOld) < result.orientationXYThreshold) {
-						pi.press(pi.MOTION_ORIENTATION_X);
-						pi.press(pi.MOTION_ORIENTATION_Y);
+					if (Math.abs(dx) + Math.abs(dy) < result.orientationXYDeadZone) {
+						result.press(pi.MOTION_ORIENTATION_X);
+						result.press(pi.MOTION_ORIENTATION_Y);
 					}
 
 					if (result.orientationXYNormalized) {
@@ -570,8 +570,8 @@ var pi = {
 						dy = y - (yOld > 0 ? Math.max(0, (yOld - result.orientationXYDeadZone) / angleRange) : Math.min(0, (yOld + result.orientationXYDeadZone) / angleRange));
 					}
 
-					pi.move(pi.MOTION_ORIENTATION_X, { v: x, dv: dx });
-					pi.move(pi.MOTION_ORIENTATION_Y, { v: y, dv: dy });
+					result.move(pi.MOTION_ORIENTATION_X, { v: x, dv: dx });
+					result.move(pi.MOTION_ORIENTATION_Y, { v: y, dv: dy });
 				} else {
 					dx = -x;
 					dy = -y;
@@ -583,11 +583,11 @@ var pi = {
 							dy = -(yOld > 0 ? Math.max(0, (yOld - result.orientationXYDeadZone) / angleRange) : Math.min(0, (yOld + result.orientationXYDeadZone) / angleRange));
 						}
 
-						pi.move(pi.MOTION_ORIENTATION_X, { v: x, dv: dx });
-						pi.release(pi.MOTION_ORIENTATION_X);
+						result.move(pi.MOTION_ORIENTATION_X, { v: x, dv: dx });
+						result.release(pi.MOTION_ORIENTATION_X);
 						
-						pi.move(pi.MOTION_ORIENTATION_Y, { v: y, dv: dy });
-						pi.release(pi.MOTION_ORIENTATION_X);
+						result.move(pi.MOTION_ORIENTATION_Y, { v: y, dv: dy });
+						result.release(pi.MOTION_ORIENTATION_X);
 					}
 				}
 
@@ -604,6 +604,8 @@ var pi = {
 			}
 
 			// z orientation handling
+
+			return false;
 		}
 
 		// motion

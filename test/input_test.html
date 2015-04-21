@@ -92,6 +92,22 @@ console.log("smear", smear);
 
 var t2 = {val:0,times:[]};
 
+
+var orientControl = new IN.Control({
+	move: function(e) {
+		if (e.component === IN.MOTION_ORIENTATION_X) e.target.x = e.move.v;
+		if (e.component === IN.MOTION_ORIENTATION_Y) e.target.y = e.move.v;
+
+		testElement.innerHTML = "X: " + e.target.x + "<br>Y: " + e.target.y;
+	}
+});
+
+var orientBinding = new input2.bind({
+	control: orientControl,
+	component: [IN.MOTION_ORIENTATION_X, IN.MOTION_ORIENTATION_Y],
+	target: { x: 0, y: 0 }
+});
+
 var c2 = new IN.Control({
 	press: function(e){
 		console.log("2 press");
