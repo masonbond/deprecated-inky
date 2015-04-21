@@ -1,5 +1,10 @@
 ;var IN = (function() {"use strict";
 
+// helpful constants
+var constants = {
+	DEGREES_TO_RADIANS: Math.PI / 180
+};
+
 // default values for new objects
 var defaults = {
 	pollRate: 50,
@@ -28,14 +33,22 @@ var defaults = {
 	touchSnap: true,
 	touchFloatOrigin: true,
 	touchAllowScrolling: false,
-	touchNormalized: true
+	touchNormalized: true,
+	orientationXYThreshold: 0.01,
+	orientationXYDeadZone: 0.1,
+	orientationXYNormalized: false,
+	orientationZThreshold: 0.01,
+	orientationZDeadZone: 0.1,
+	orientationZNormalized: false,
 };
 
+// TODO put normalize1D(val, min, max) logic in helper func
+// TODO inconsistency with deadzone treatment and manual normalization?
 // TODO orientation
 // TODO mouse move custom args
 // TODO multitouch audit/necessary fixes
 // TODO onError callback for pointer lock requests
-// TODO way to select radial when rebinding
+// TODO way to select radial when rebinding, maybe group like components and give resolveConflict callback to bind?
 
 
 // static privates
@@ -289,6 +302,18 @@ var pi = {
 		var derived = [0, 0, 0, 0];
 		var oldDerived = [0, 0, 0, 0];
 		var oldMX = undefined, oldMY = undefined;
+		var calibration = {
+				orientation: [0, 0, 0, 0],
+				orientationVector: [0, 0, 0],
+				acceleration: [0, 0, 0, 0],
+				accelerationGravity: [0, 0, 0, 0],
+				rotation: [0, 0, 0, 0]
+			};
+		var oldOrientationVector = [0, 0, 0];
+		var lastReportedOrientation = [0, 0, 0];
+		var acceleration = { old: [0, 0, 0, 0], cur: [0, 0, 0, 0] };
+		var accelerationGravity = { old: [0, 0, 0, 0], cur: [0, 0, 0, 0] };
+		var rotation = { old: [0, 0, 0, 0], cur: [0, 0, 0, 0] };
 
 		var rebindTarget = {
 			control: undefined,
@@ -457,6 +482,136 @@ var pi = {
 					oldList[i] = cur;
 				}
 			}
+		}
+
+		// orientation
+
+		window.addEventListener('deviceorientation', orientationInit);
+
+		function orientationInit(e) {
+			var x = pi.async[pi.MOTION_ORIENTATION_X] = e.beta * constants.DEGREES_TO_RADIANS,
+				y = pi.async[pi.MOTION_ORIENTATION_Y] = e.gamma * constants.DEGREES_TO_RADIANS,
+				z = pi.async[pi.MOTION_ORIENTATION_Z] = e.alpha * constants.DEGREES_TO_RADIANS,
+				vx = Math.cos(y),
+				vy = Math.cos(x),
+				vz = Math.sin(y),
+				vl = Math.sqrt(vx * vx + vy * vy + vz * vz);
+
+			result.calibrateOrientation();
+
+			oldOrientationVector[0] = vx / vl;
+			oldOrientationVector[1] = vy / vl;
+			oldOrientationVector[2] = vz / vl;
+
+			window.removeEventListener('deviceorientation', orientationInit);
+			window.addEventListener('deviceorientation', orientationHandler);
+		}
+
+		function orientationHandler(e) {
+			// we don't extend IN.Device for this because we want to normalize multiple axes
+			// that all have different input ranges
+
+			lastReportedOrientation[0] = e.beta * constants.DEGREES_TO_RADIANS;
+			lastReportedOrientation[1] = e.gamma * constants.DEGREES_TO_RADIANS;
+			lastReportedOrientation[2] = e.alpha * constants.DEGREES_TO_RADIANS;
+
+			var x = lastReportedOrientation[0] - calibration.orientation[0],
+				y = lastReportedOrientation[1] - calibration.orientation[1],
+				z = lastReportedOrientation[2] - calibration.orientation[2],
+				vx = Math.cos(y),
+				vy = Math.sin(x),
+				vz = Math.sin(y),
+				vl = Math.sqrt(vx * vx + vy * vy + vz * vz),
+				xOld = pi.async[pi.MOTION_ORIENTATION_X] - calibration.orientation[0],
+				yOld = pi.async[pi.MOTION_ORIENTATION_Y] - calibration.orientation[1],
+				zOld = pi.async[pi.MOTION_ORIENTATION_Z] - calibration.orientation[2],
+				dx = x - xOld,
+				dy = y - xOld,
+				dz = z - xOld,
+				vxOld = oldOrientationVector[0],
+				vyOld = oldOrientationVector[1],
+				vzOld = oldOrientationVector[2],
+				angleDiff;
+
+			// x/y orientation handling
+
+			vx /= vl;
+			vy /= vl;
+			vz /= vl;
+
+			// measure of angle between this and last x/y orientation
+			angleDiff = Math.acos(Math.min(1, vx * vxOld + vy * vyOld + vz * vzOld));
+
+			if (angleDiff > result.orientationThreshold) {
+				var vxNeutral = Math.cos(calibration.orientation[1]),
+					vyNeutral = Math.sin(calibration.orientation[0]),
+					vzNeutral = Math.sin(calibration.orientation[1]),
+					vlNeutral = Math.sqrt(vxNeutral * vxNeutral + vyNeutral * vyNeutral + vzNeutral * vzNeutral),
+					angleFromCenter,
+					angleRange = 1 - result.orientationXYDeadZone;
+
+				vxNeutral /= vlNeutral;
+				vyNeutral /= vlNeutral;
+				vzNeutral /= vlNeutral;
+
+				// measure of angle between x/y orientation and "neutral" calibration position
+				angleFromCenter = Math.acos(Math.min(1, vx * vxNeutral + vy * vyNeutral + vz * vzNeutral));
+
+				if (angleFromCenter > result.orientationXYDeadZone) {
+					if (Math.abs(xOld) + Math.abs(yOld) < result.orientationXYThreshold) {
+						pi.press(pi.MOTION_ORIENTATION_X);
+						pi.press(pi.MOTION_ORIENTATION_Y);
+					}
+
+					if (result.orientationXYNormalized) {
+						x = x > 0 ? Math.max(0, (x - result.orientationXYDeadZone) / angleRange) : Math.min(0, (x + result.orientationXYDeadZone) / angleRange);
+						y = y > 0 ? Math.max(0, (y - result.orientationXYDeadZone) / angleRange) : Math.min(0, (y + result.orientationXYDeadZone) / angleRange);
+						dx = x - (xOld > 0 ? Math.max(0, (xOld - result.orientationXYDeadZone) / angleRange) : Math.min(0, (xOld + result.orientationXYDeadZone) / angleRange));
+						dy = y - (yOld > 0 ? Math.max(0, (yOld - result.orientationXYDeadZone) / angleRange) : Math.min(0, (yOld + result.orientationXYDeadZone) / angleRange));
+					}
+
+					pi.move(pi.MOTION_ORIENTATION_X, { v: x, dv: dx });
+					pi.move(pi.MOTION_ORIENTATION_Y, { v: y, dv: dy });
+				} else {
+					dx = -x;
+					dy = -y;
+					x = y = 0;
+
+					if (Math.abs(xOld) + Math.abs(yOld) > 0) {
+						if (result.orientationXYNormalized) {
+							dx = -(xOld > 0 ? Math.max(0, (xOld - result.orientationXYDeadZone) / angleRange) : Math.min(0, (xOld + result.orientationXYDeadZone) / angleRange));
+							dy = -(yOld > 0 ? Math.max(0, (yOld - result.orientationXYDeadZone) / angleRange) : Math.min(0, (yOld + result.orientationXYDeadZone) / angleRange));
+						}
+
+						pi.move(pi.MOTION_ORIENTATION_X, { v: x, dv: dx });
+						pi.release(pi.MOTION_ORIENTATION_X);
+						
+						pi.move(pi.MOTION_ORIENTATION_Y, { v: y, dv: dy });
+						pi.release(pi.MOTION_ORIENTATION_X);
+					}
+				}
+
+				// what was new is old again
+				// TODO will this work after recalibration?
+				oldOrientationVector[0] = vx;
+				oldOrientationVector[1] = vy;
+				oldOrientationVector[2] = vz;
+
+				// store non-normalized values in async table
+				pi.async[pi.MOTION_ORIENTATION_X] = lastReportedOrientation[0];
+				pi.async[pi.MOTION_ORIENTATION_Y] = lastReportedOrientation[1];
+				pi.async[pi.MOTION_ORIENTATION_Z] = lastReportedOrientation[2];
+			}
+
+			// z orientation handling
+		}
+
+		// motion
+
+		window.addEventListener('devicemotion', motionHandler);
+
+		function motionHandler(e) {
+
 		}
 
 		// mouse
@@ -638,16 +793,27 @@ var pi = {
 			enabled: args && args.enabled !== undefined ? args.enabled : defaults.dispatcherEnabled,
 			autoPoll: args && args.autoPoll !== undefined ? args.autoPoll : defaults.autoPoll,
 			pollRate: oldPollRate,
+			
 			analogDeadZone: Math.max(0.00001, args && args.analogDeadZone !== undefined ? args.analogDeadZone : defaults.analogDeadZone),
 			analogThreshold: args && args.analogThreshold !== undefined ? args.analogThreshold : defaults.analogThreshold,
 			analogNormalized: args && args.analogNormalized !== undefined ? args.analogNormalized : defaults.analogNormalized,
+			
+			orientationXYDeadZone: args && args.orientationXYDeadZone !== undefined ? args.orientationXYDeadZone : defaults.orientationXYDeadZone,
+			orientationZDeadZone: args && args.orientationZDeadZone !== undefined ? args.orientationZDeadZone : defaults.orientationZDeadZone,
+			orientationXYThreshold: args && args.orientationXYThreshold !== undefined ? args.orientationXYThreshold : defaults.orientationXYThreshold,
+			orientationZThreshold: args && args.orientationZThreshold !== undefined ? args.orientationZThreshold : defaults.orientationZThreshold,
+			orientationXYNormalized: args && args.orientationXYNormalized !== undefined ? args.orientationXYNormalized : defaults.orientationXYNormalized,
+			orientationZNormalized: args && args.orientationZNormalized !== undefined ? args.orientationZNormalized : defaults.orientationZNormalized,
+			
 			allowContextMenu: args && args.allowContextMenu !== undefined ? args.allowContextMenu : defaults.allowContextMenu,
 			allowMiddleMouseScroll: args && args.allowMiddleMouseScroll !== undefined ? args.allowMiddleMouseScroll : defaults.allowMiddleMouseScroll,
 			allowSelect: args && args.allowSelect !== undefined ? args.allowSelect : defaults.allowSelect,
 			allowDrag: args && args.allowDrag !== undefined ? args.allowDrag : defaults.allowDrag,
 			allowFocusOnHover: args && args.allowFocusOnHover !== undefined ? args.allowFocusOnHover : defaults.allowFocusOnHover,
 			allowDefaultKeyboardEvents: args && args.allowDefaultKeyboardEvents !== undefined ? args.allowDefaultKeyboardEvents : defaults.allowDefaultKeyboardEvents,
+			
 			element: oldTargetElement,
+			
 			press: function(component, time) {
 				if (result.enabled) raiseEvents(result, listeners[component], beforePress, component, time);
 			},
@@ -696,6 +862,11 @@ var pi = {
 			},
 			exitPointerLock: function(onExit) {
 				if (pointerLockElement === oldTargetElement) IN.Mouse.exitPointerLock(onExit);
+			},
+			calibrateOrientation: function() {
+				calibration.orientationVector[0] = pi.async[pi.MOTION_ORIENTATION_X];
+				calibration.orientationVector[1] = pi.async[pi.MOTION_ORIENTATION_Y];
+				calibration.orientationVector[2] = pi.async[pi.MOTION_ORIENTATION_Z];
 			},
 			poll: function() {
 				// see if result.element changed on us
@@ -765,7 +936,7 @@ var pi = {
 					diff = cur - old,
 					v,
 					dv,
-					range;
+					range = 1 - result.deadZone;
 
 				if (Math.abs(diff) >= result.threshold) {
 					range = 1 - result.deadZone;
@@ -777,7 +948,6 @@ var pi = {
 						dv = diff;
 
 						if (result.normalized && componentNormalized) {
-							range = 1 - result.deadZone;
 							v = cur > 0 ? Math.max(0, (cur - result.deadZone) / range) : Math.min(0, (cur + result.deadZone) / range);
 							dv = v - (old > 0 ? Math.max(0, (old - result.deadZone) / range) : Math.min(0, (old + result.deadZone) / range));
 						}
@@ -787,7 +957,7 @@ var pi = {
 						cur = v = 0;
 						dv = diff = -old;
 
-						if (Math.abs(old) >= 0) {
+						if (Math.abs(old) > 0) {
 							if (result.normalized && componentNormalized) {
 								dv = -(old > 0 ? Math.max(0, (old - result.deadZone) / range) : Math.min(0, (old + result.deadZone) / range));	
 							}
@@ -820,7 +990,7 @@ var pi = {
 		// listen for events
 		for (var eventName in result.events) {
 			var e = result.events[eventName];
-			if (typeof e.callback === 'function') (e.node || document).addEventListener(eventName, (function(e){
+			if (typeof e.callback === 'function') (e.target || document).addEventListener(eventName, (function(e){
 				return function(event) {
 					eventContext.event = event;
 					var callbackResult = e.callback(eventContext);
@@ -843,7 +1013,7 @@ var pi = {
 	TouchArea: function(args) {
 		// construct a new TouchArea by extending a Device object
 		var touchListener = { 
-			node: args && args.element,
+			target: args && args.element,
 			callback: touchHandler
 		};
 
@@ -881,7 +1051,7 @@ var pi = {
 		});
 
 		// extended properties
-		result.element = touchListener.node;
+		result.element = touchListener.target;
 		result.allowScrolling = args && args.allowScrolling !== undefined && args.allowScrolling || defaults.touchAllowScrolling;
 		result.snap = args && args.snap !== undefined ? args.snap : defaults.touchSnap;
 		result.floatOrigin = args && args.floatOrigin !== undefined ? args.floatOrigin : defaults.touchFloatOrigin;
@@ -963,6 +1133,7 @@ var components = {
 	GAMEPAD_1: "Gamepad 1",
 	GAMEPAD_2: "Gamepad 2",
 	GAMEPAD_3: "Gamepad 3",
+	MOTION: "Motion",
 	
 	// gamepad components
 
@@ -1007,6 +1178,24 @@ var components = {
 	GAMEPAD_LEFT_STICK_RADIAL_Y: "Left Stick Radial Y",
 	GAMEPAD_RIGHT_STICK_RADIAL_X: "Right Stick Radial X",
 	GAMEPAD_RIGHT_STICK_RADIAL_Y: "Right Stick Radial Y",
+
+	// orientation & motion
+
+	MOTION_ORIENTATION_X: "Orientation X",
+	MOTION_ORIENTATION_Y: "Orientation Y",
+	MOTION_ORIENTATION_Z: "Orientation Z",
+
+	MOTION_ACCELERATION_X: "Acceleration X",
+	MOTION_ACCELERATION_Y: "Acceleration Y",
+	MOTION_ACCELERATION_Z: "Acceleration Z",
+
+	MOTION_ACCELERATION_WITH_GRAVITY_X: "Acceleration with Gravity X",
+	MOTION_ACCELERATION_WITH_GRAVITY_Y: "Acceleration with Gravity Y",
+	MOTION_ACCELERATION_WITH_GRAVITY_Z: "Acceleration with Gravity Z",
+
+	MOTION_ROTATION_X: "Rotational Speed X",
+	MOTION_ROTATION_Y: "Rotational Speed Y",
+	MOTION_ROTATION_Z: "Rotational Speed Z",
 
 	// mouse
 
@@ -1160,6 +1349,9 @@ for (var code in components) {
 		case "GAMEPAD":
 			componentToDevice[pi[code]] = pi.GAMEPAD;
 			if (splitCode.length > 1 && splitCode[1].match(/[^\d]/g) === null) componentToDevice[pi[code]] += " " + splitCode[1];
+			break;
+		case "MOTION":
+			componentToDevice[pi[code]] = pi.MOTION;
 			break;
 	}
 }
