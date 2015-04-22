@@ -308,7 +308,7 @@ var pi = {
 				accelerationGravity: [0, 0, 0, 0],
 				rotation: [0, 0, 0, 0]
 			};
-		var oldOrientationVector = [0, 0, 0];
+		var oldOrientation = [0, 0, 0];
 		var lastReportedOrientation = [0, 0, 0];
 		var acceleration = { old: [0, 0, 0, 0], cur: [0, 0, 0, 0] };
 		var accelerationGravity = { old: [0, 0, 0, 0], cur: [0, 0, 0, 0] };
@@ -455,7 +455,7 @@ var pi = {
 
 						pi.async[code] = pi.async[padIndexComponent] = cur;
 
-						if ((Math.abs(old) < (alreadyNormalized ? result.analogThreshold : result.analogDeadZone)) && isFocused()) {
+						if ((Math.abs(old) <= (alreadyNormalized ? result.analogThreshold : result.analogDeadZone)) && isFocused()) {
 							result.press(code);
 							result.press(padIndexComponent);
 						}
@@ -496,9 +496,12 @@ var pi = {
 				vz = Math.sin(y),
 				vl = Math.sqrt(vx * vx + vy * vy + vz * vz);
 
-			oldOrientationVector[0] = vx / vl;
-			oldOrientationVector[1] = vy / vl;
-			oldOrientationVector[2] = vz / vl;
+			oldOrientation[0] = vx / vl;
+			oldOrientation[1] = vy / vl;
+			oldOrientation[2] = vz / vl;
+
+			// init angle diff between calibration vector and orientation vector
+			oldOrientation[3] = 0;
 
 			window.removeEventListener('deviceorientation', orientationInit);
 			window.addEventListener('deviceorientation', orientationHandler);
@@ -525,9 +528,9 @@ var pi = {
 				dx = x - xOld,
 				dy = y - yOld,
 				dz = z - zOld,
-				vxOld = oldOrientationVector[0],
-				vyOld = oldOrientationVector[1],
-				vzOld = oldOrientationVector[2],
+				vxOld = oldOrientation[0],
+				vyOld = oldOrientation[1],
+				vzOld = oldOrientation[2],
 				angleDiff;
 
 			// x/y orientation handling
@@ -555,7 +558,7 @@ var pi = {
 				angleFromCenter = Math.acos(Math.min(1, vx * vxNeutral + vy * vyNeutral + vz * vzNeutral));
 
 				if (angleFromCenter > result.orientationXYDeadZone) {
-					if (Math.abs(dx) + Math.abs(dy) < result.orientationXYDeadZone) {
+					if (oldOrientation[3] <= result.orientationXYDeadZone) {
 						result.press(pi.MOTION_ORIENTATION_X);
 						result.press(pi.MOTION_ORIENTATION_Y);
 					}
@@ -574,7 +577,7 @@ var pi = {
 					dy = -y;
 					x = y = 0;
 
-					if (Math.abs(xOld) + Math.abs(yOld) > 0) {
+					if (oldOrientation[3] > 0) {
 						if (result.orientationXYNormalized) {
 							dx = -(xOld > 0 ? Math.max(0, (xOld - result.orientationXYDeadZone) / angleRange) : Math.min(0, (xOld + result.orientationXYDeadZone) / angleRange));
 							dy = -(yOld > 0 ? Math.max(0, (yOld - result.orientationXYDeadZone) / angleRange) : Math.min(0, (yOld + result.orientationXYDeadZone) / angleRange));
@@ -590,19 +593,50 @@ var pi = {
 
 				// what was new is old again
 				// TODO will this work after recalibration?
-				oldOrientationVector[0] = vx;
-				oldOrientationVector[1] = vy;
-				oldOrientationVector[2] = vz;
+				oldOrientation[0] = vx;
+				oldOrientation[1] = vy;
+				oldOrientation[3] = angleFromCenter;
 
 				// store non-normalized values in async table
 				pi.async[pi.MOTION_ORIENTATION_X] = lastReportedOrientation[0];
 				pi.async[pi.MOTION_ORIENTATION_Y] = lastReportedOrientation[1];
-				pi.async[pi.MOTION_ORIENTATION_Z] = lastReportedOrientation[2];
 			}
 
 			// z orientation handling
 
-			return false;
+			var zDiff = Math.abs(dz),
+				zOld = oldOrientation[2];
+
+			if (zDiff > result.orientationZThreshold) {
+				if (zDiff > result.orientationZDeadZone) {
+					if (Math.abs(zOld) <= result.orientationZDeadZone) result.press(pi.MOTION_ORIENTATION_Z);
+
+					if (result.orientationZNormalized) {
+						// TODO normalize
+					}
+
+					result.move(pi.MOTION_ORIENTATION_Z, { v: z, dv: dz });
+				} else {
+					z = 0;
+					dz = -zOld;
+
+					if (Math.abs(zOld) > 0) {
+
+						if (result.orientationZNormalized) {
+							// TODO normalize
+						}
+
+						result.move(pi.MOTION_ORIENTATION_Z, { v: z, dv: dz });
+						result.release(pi.MOTION_ORIENTATION_Z);
+					}
+				}
+
+				// update "old" values
+
+				oldOrientation[2] = vz;
+
+				pi.async[pi.MOTION_ORIENTATION_Z] = lastReportedOrientation[2];
+			}
 		}
 
 		// motion
@@ -941,7 +975,7 @@ var pi = {
 					range = 1 - result.deadZone;
 
 					if (Math.abs(cur) > (alreadyNormalized ? 0 : result.deadZone)) {
-						if (Math.abs(old) < (alreadyNormalized ? result.threshold : result.deadZone)) pi.press(component);
+						if (Math.abs(old) <= (alreadyNormalized ? result.threshold : result.deadZone)) pi.press(component);
 
 						v = cur;
 						dv = diff;
