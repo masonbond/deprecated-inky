@@ -98,14 +98,16 @@ var orientControl = new IN.Control({
 		if (e.component === IN.MOTION_ORIENTATION_X) e.target.x = e.move.v;
 		if (e.component === IN.MOTION_ORIENTATION_Y) e.target.y = e.move.v;
 
-		testElement.innerHTML = "X: " + e.target.x + "<br>Y: " + e.target.y;
+		if (e.move.v === 0) ++e.target.n;
+
+		testElement.innerHTML = e.target.n + "<br>X: " + e.target.x + "<br>Y: " + e.target.y;
 	}
 });
 
 var orientBinding = new input2.bind({
 	control: orientControl,
 	component: [IN.MOTION_ORIENTATION_X, IN.MOTION_ORIENTATION_Y],
-	target: { x: 0, y: 0 }
+	target: { x: 0, y: 0, n: 0}
 });
 
 var c2 = new IN.Control({

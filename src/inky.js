@@ -44,6 +44,7 @@ var defaults = {
 	orientationZNormalized: false,
 };
 
+// TODO investigate 0s at orientation 180 range and also extra move events called when v = 0
 // TODO -180...180 range transform for orientation z?
 // TODO put post-calibration orientation values back in proper ranges
 // TODO put normalize1D(val, min, max) logic in helper func
@@ -560,7 +561,7 @@ var pi = {
 				vzNeutral /= vlNeutral;
 
 				// measure of angle between x/y orientation and "neutral" calibration position
-				angleFromCenter = Math.acos(Math.min(1, vx * vxNeutral + vy * vyNeutral + vz * vzNeutral));
+				angleFromCenter = Math.acos(Math.max(-1, Math.min(1, vx * vxNeutral + vy * vyNeutral + vz * vzNeutral)));
 
 				if (angleFromCenter > result.orientationXYDeadZone) {
 					if (oldOrientation[3] <= result.orientationXYDeadZone) {
