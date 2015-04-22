@@ -304,7 +304,6 @@ var pi = {
 		var oldMX = undefined, oldMY = undefined;
 		var calibration = {
 				orientation: [0, 0, 0, 0],
-				orientationVector: [0, 0, 0],
 				acceleration: [0, 0, 0, 0],
 				accelerationGravity: [0, 0, 0, 0],
 				rotation: [0, 0, 0, 0]
@@ -489,15 +488,13 @@ var pi = {
 		window.addEventListener('deviceorientation', orientationInit);
 
 		function orientationInit(e) {
-			var x = pi.async[pi.MOTION_ORIENTATION_X] = e.beta * constants.DEGREES_TO_RADIANS,
-				y = pi.async[pi.MOTION_ORIENTATION_Y] = e.gamma * constants.DEGREES_TO_RADIANS,
-				z = pi.async[pi.MOTION_ORIENTATION_Z] = e.alpha * constants.DEGREES_TO_RADIANS,
+			var x = pi.async[pi.MOTION_ORIENTATION_X] = lastReportedOrientation[0] = e.beta * constants.DEGREES_TO_RADIANS,
+				y = pi.async[pi.MOTION_ORIENTATION_Y] = lastReportedOrientation[1] = e.gamma * constants.DEGREES_TO_RADIANS,
+				z = pi.async[pi.MOTION_ORIENTATION_Z] = lastReportedOrientation[2] = e.alpha * constants.DEGREES_TO_RADIANS,
 				vx = Math.cos(y),
 				vy = Math.cos(x),
 				vz = Math.sin(y),
 				vl = Math.sqrt(vx * vx + vy * vy + vz * vz);
-
-			result.calibrateOrientation();
 
 			oldOrientationVector[0] = vx / vl;
 			oldOrientationVector[1] = vy / vl;
@@ -866,9 +863,9 @@ var pi = {
 				if (pointerLockElement === oldTargetElement) IN.Mouse.exitPointerLock(onExit);
 			},
 			calibrateOrientation: function() {
-				calibration.orientationVector[0] = pi.async[pi.MOTION_ORIENTATION_X];
-				calibration.orientationVector[1] = pi.async[pi.MOTION_ORIENTATION_Y];
-				calibration.orientationVector[2] = pi.async[pi.MOTION_ORIENTATION_Z];
+				calibration.orientation[0] = lastReportedOrientation[0];
+				calibration.orientation[1] = lastReportedOrientation[1];
+				calibration.orientation[2] = lastReportedOrientation[2];
 			},
 			poll: function() {
 				// see if result.element changed on us
