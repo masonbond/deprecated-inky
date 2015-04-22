@@ -2,6 +2,8 @@
 
 // helpful constants
 var constants = {
+	DOUBLE_PI: Math.PI * 2,
+	HALF_PI: Math.PI / 2,
 	DEGREES_TO_RADIANS: Math.PI / 180
 };
 
@@ -42,6 +44,8 @@ var defaults = {
 	orientationZNormalized: false,
 };
 
+// TODO -180...180 range transform for orientation z?
+// TODO put post-calibration orientation values back in proper ranges
 // TODO put normalize1D(val, min, max) logic in helper func
 // TODO inconsistency with deadzone treatment and manual normalization?
 // TODO orientation
@@ -548,7 +552,8 @@ var pi = {
 					vzNeutral = Math.sin(calibration.orientation[1]),
 					vlNeutral = Math.sqrt(vxNeutral * vxNeutral + vyNeutral * vyNeutral + vzNeutral * vzNeutral),
 					angleFromCenter,
-					angleRange = 1 - result.orientationXYDeadZone;
+					angleRangeX = Math.PI - result.orientationXYDeadZone,
+					angleRangeY = constants.HALF_PI - result.orientationXYDeadZone;
 
 				vxNeutral /= vlNeutral;
 				vyNeutral /= vlNeutral;
@@ -564,10 +569,10 @@ var pi = {
 					}
 
 					if (result.orientationXYNormalized) {
-						x = x > 0 ? Math.max(0, (x - result.orientationXYDeadZone) / angleRange) : Math.min(0, (x + result.orientationXYDeadZone) / angleRange);
-						y = y > 0 ? Math.max(0, (y - result.orientationXYDeadZone) / angleRange) : Math.min(0, (y + result.orientationXYDeadZone) / angleRange);
-						dx = x - (xOld > 0 ? Math.max(0, (xOld - result.orientationXYDeadZone) / angleRange) : Math.min(0, (xOld + result.orientationXYDeadZone) / angleRange));
-						dy = y - (yOld > 0 ? Math.max(0, (yOld - result.orientationXYDeadZone) / angleRange) : Math.min(0, (yOld + result.orientationXYDeadZone) / angleRange));
+						x = x > 0 ? Math.max(0, (x - result.orientationXYDeadZone) / angleRangeX) : Math.min(0, (x + result.orientationXYDeadZone) / angleRangeX);
+						y = y > 0 ? Math.max(0, (y - result.orientationXYDeadZone) / angleRangeY) : Math.min(0, (y + result.orientationXYDeadZone) / angleRangeY);
+						dx = x - (xOld > 0 ? Math.max(0, (xOld - result.orientationXYDeadZone) / angleRangeX) : Math.min(0, (xOld + result.orientationXYDeadZone) / angleRangeX));
+						dy = y - (yOld > 0 ? Math.max(0, (yOld - result.orientationXYDeadZone) / angleRangeY) : Math.min(0, (yOld + result.orientationXYDeadZone) / angleRangeY));
 					}
 
 					result.move(pi.MOTION_ORIENTATION_X, { v: x, dv: dx });
@@ -579,8 +584,8 @@ var pi = {
 
 					if (oldOrientation[3] > 0) {
 						if (result.orientationXYNormalized) {
-							dx = -(xOld > 0 ? Math.max(0, (xOld - result.orientationXYDeadZone) / angleRange) : Math.min(0, (xOld + result.orientationXYDeadZone) / angleRange));
-							dy = -(yOld > 0 ? Math.max(0, (yOld - result.orientationXYDeadZone) / angleRange) : Math.min(0, (yOld + result.orientationXYDeadZone) / angleRange));
+							dx = -(xOld > 0 ? Math.max(0, (xOld - result.orientationXYDeadZone) / angleRangeX) : Math.min(0, (xOld + result.orientationXYDeadZone) / angleRangeX));
+							dy = -(yOld > 0 ? Math.max(0, (yOld - result.orientationXYDeadZone) / angleRangeY) : Math.min(0, (yOld + result.orientationXYDeadZone) / angleRangeY));
 						}
 
 						result.move(pi.MOTION_ORIENTATION_X, { v: x, dv: dx });
@@ -608,11 +613,14 @@ var pi = {
 				zOld = oldOrientation[2];
 
 			if (zDiff > result.orientationZThreshold) {
+				var angleRangeZ = constants.DOUBLE_PI - result.orientationZDeadZone;
+
 				if (zDiff > result.orientationZDeadZone) {
 					if (Math.abs(zOld) <= result.orientationZDeadZone) result.press(pi.MOTION_ORIENTATION_Z);
 
 					if (result.orientationZNormalized) {
-						// TODO normalize
+						z = z > 0 ? Math.max(0, (z - result.orientationZDeadZone) / angleRangeZ) : Math.min(0, (z + result.orientationZDeadZone) / angleRangeZ);
+						dz = z - (zOld > 0 ? Math.max(0, (zOld - result.orientationZDeadZone) / angleRangeZ) : Math.min(0, (zOld + result.orientationZDeadZone) / angleRangeZ));
 					}
 
 					result.move(pi.MOTION_ORIENTATION_Z, { v: z, dv: dz });
@@ -621,9 +629,8 @@ var pi = {
 					dz = -zOld;
 
 					if (Math.abs(zOld) > 0) {
-
 						if (result.orientationZNormalized) {
-							// TODO normalize
+							dz = -(zOld > 0 ? Math.max(0, (zOld - result.orientationZDeadZone) / angleRangeZ) : Math.min(0, (zOld + result.orientationZDeadZone) / angleRangeZ));
 						}
 
 						result.move(pi.MOTION_ORIENTATION_Z, { v: z, dv: dz });
