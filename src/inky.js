@@ -44,11 +44,9 @@ var defaults = {
 	orientationZNormalized: false,
 };
 
-// TODO -180...180 range transform for orientation z?
-// TODO put post-calibration orientation values back in proper ranges
+// TODO motion/acceleration
 // TODO put normalize1D(val, min, max) logic in helper func
 // TODO inconsistency with deadzone treatment and manual normalization?
-// TODO orientation
 // TODO mouse move custom args
 // TODO multitouch audit/necessary fixes
 // TODO onError callback for pointer lock requests
@@ -529,9 +527,9 @@ var pi = {
 				xOld = pi.async[pi.MOTION_ORIENTATION_X] - calibration.orientation[0],
 				yOld = pi.async[pi.MOTION_ORIENTATION_Y] - calibration.orientation[1],
 				zOld = pi.async[pi.MOTION_ORIENTATION_Z] - calibration.orientation[2],
-				dx = x - xOld,
-				dy = y - yOld,
-				dz = z - zOld,
+				dx,
+				dy,
+				dz,
 				vxOld = oldOrientation[0],
 				vyOld = oldOrientation[1],
 				vzOld = oldOrientation[2],
@@ -559,10 +557,22 @@ var pi = {
 				vyNeutral /= vlNeutral;
 				vzNeutral /= vlNeutral;
 
-
-
 				// measure of angle between x/y orientation and "neutral" calibration position
 				angleFromCenter = Math.acos(Math.max(-1, Math.min(1, vx * vxNeutral + vy * vyNeutral + vz * vzNeutral)));
+
+				// wrap x and y to the proper range
+				if (x > Math.PI) x = x % Math.PI - Math.PI;
+				else if (x < -Math.PI) x = Math.PI + x % Math.PI;
+				if (y > constants.HALF_PI) y = y % constants.HALF_PI - constants.HALF_PI;
+				else if (y < -constants.HALF_PI) y = constants.HALF_PI + y % constants.HALF_PI;
+
+				if (xOld > Math.PI) xOld = xOld % Math.PI - Math.PI;
+				else if (xOld < -Math.PI) xOld = Math.PI + xOld % Math.PI;
+				if (yOld > constants.HALF_PI) yOld = yOld % constants.HALF_PI - constants.HALF_PI;
+				else if (yOld < -constants.HALF_PI) yOld = constants.HALF_PI + yOld % constants.HALF_PI;
+
+				dx = x - xOld;
+				dy = y - yOld;
 
 				if (Math.abs(x) > constants.HALF_PI || angleFromCenter > result.orientationXYDeadZone) {
 					if (oldOrientation[3] <= result.orientationXYDeadZone) {
@@ -610,6 +620,13 @@ var pi = {
 			}
 
 			// z orientation handling
+
+			if (z > constants.DOUBLE_PI) z = z % constants.DOUBLE_PI - constants.DOUBLE_PI;
+			else if (z < -constants.DOUBLE_PI) z = constants.DOUBLE_PI + z % constants.DOUBLE_PI;
+			if (zOld > constants.DOUBLE_PI) zOld = zOld % constants.DOUBLE_PI - constants.DOUBLE_PI;
+			else if (zOld < -constants.DOUBLE_PI) zOld = constants.DOUBLE_PI + zOld % constants.DOUBLE_PI;
+
+			dz = z - zOld;
 
 			var zDiff = Math.abs(dz),
 				zOld = oldOrientation[2];
