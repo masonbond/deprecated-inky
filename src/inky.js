@@ -44,7 +44,6 @@ var defaults = {
 	orientationZNormalized: false,
 };
 
-// TODO investigate 0s at orientation 180 range and also extra move events called when v = 0
 // TODO -180...180 range transform for orientation z?
 // TODO put post-calibration orientation values back in proper ranges
 // TODO put normalize1D(val, min, max) logic in helper func
@@ -545,7 +544,7 @@ var pi = {
 			vz /= vl;
 
 			// measure of angle between this and last x/y orientation
-			angleDiff = Math.acos(Math.min(1, vx * vxOld + vy * vyOld + vz * vzOld));
+			angleDiff = Math.acos(Math.max(-1, Math.min(1, vx * vxOld + vy * vyOld + vz * vzOld)));
 
 			if (angleDiff > result.orientationXYThreshold) {
 				var vxNeutral = Math.cos(calibration.orientation[1]),
@@ -560,10 +559,12 @@ var pi = {
 				vyNeutral /= vlNeutral;
 				vzNeutral /= vlNeutral;
 
+
+
 				// measure of angle between x/y orientation and "neutral" calibration position
 				angleFromCenter = Math.acos(Math.max(-1, Math.min(1, vx * vxNeutral + vy * vyNeutral + vz * vzNeutral)));
 
-				if (angleFromCenter > result.orientationXYDeadZone) {
+				if (Math.abs(x) > constants.HALF_PI || angleFromCenter > result.orientationXYDeadZone) {
 					if (oldOrientation[3] <= result.orientationXYDeadZone) {
 						result.press(pi.MOTION_ORIENTATION_X);
 						result.press(pi.MOTION_ORIENTATION_Y);
@@ -904,10 +905,16 @@ var pi = {
 			exitPointerLock: function(onExit) {
 				if (pointerLockElement === oldTargetElement) IN.Mouse.exitPointerLock(onExit);
 			},
-			calibrateOrientation: function() {
-				calibration.orientation[0] = lastReportedOrientation[0];
-				calibration.orientation[1] = lastReportedOrientation[1];
-				calibration.orientation[2] = lastReportedOrientation[2];
+			calibrateOrientation: function(x, y, z) {
+				if (arguments.length < 3) {
+					calibration.orientation[0] = lastReportedOrientation[0];
+					calibration.orientation[1] = lastReportedOrientation[1];
+					calibration.orientation[2] = lastReportedOrientation[2];
+				} else {
+					calibration.orientation[0] = x;
+					calibration.orientation[1] = y;
+					calibration.orientation[2] = z;
+				}
 			},
 			poll: function() {
 				// see if result.element changed on us
