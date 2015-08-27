@@ -12,17 +12,11 @@ body {
 }
 
 .test {
+	font-family: monospace;
 	position: relative;
 	width: 300px;
 	height: 300px;
 	background: black;
-}
-
-#tsest {
-	position: absolute;
-	left: 100px;
-	top: 100px;
-	background: red;
 }
 
 #smear {
@@ -93,23 +87,61 @@ console.log("smear", smear);
 
 var t2 = {val:0,times:[]};
 
+setTimeout(function() {	document.getElementById('test2').innerHTML = 'CALIBRATED ROTATION';	input2.calibratePosition(); }, 000);
 
 var orientControl = new IN.Control({
 	move: function(e) {
-		if (e.component === IN.MOTION_ORIENTATION_X) e.target.x = e.move.v;
-		if (e.component === IN.MOTION_ORIENTATION_Y) e.target.y = e.move.v;
+
+		if (e.component === IN.MOTION_ACCELERATION_X) e.target.x += Math.abs(e.move.v);
+		if (e.component === IN.MOTION_ACCELERATION_Y) e.target.y += Math.abs(e.move.v);
+		if (e.component === IN.MOTION_ACCELERATION_Z) e.target.z += Math.abs(e.move.v);
+		if (e.component === IN.MOTION_ACCELERATION_MAGNITUDE) e.target.m = Math.abs(e.move.v);
 
 		if (e.move.v === 0) ++e.target.n;
 
-		testElement.innerHTML = e.target.n + "<br>X: " + e.target.x + "<br>Y: " + e.target.y;
+		if (e.target.x > e.target.y &&
+			e.target.x > e.target.z) {
+			testElement.innerHTML = "a: 100%\nY: " + parseInt(100 * e.target.y / e.target.x, 10) + "%\nZ: " + parseInt(100 * e.target.z / e.target.x, 10) + "%";
+		} else if (e.target.y > e.target.z &&
+		    	 e.target.y > e.target.x) {
+			testElement.innerHTML = "a: " + parseInt(100 * e.target.x / e.target.y, 10) + "%\nY: 100%\nZ: " + parseInt(100 * e.target.z / e.target.y, 10) + "%";
+		} else if (e.target.z > e.target.y &&
+			e.target.z > e.target.x) {
+			testElement.innerHTML = "a: " + parseInt(100 * e.target.x / e.target.z, 10) + "%\nY: " + parseInt(100 * e.target.y / e.target.z, 10) + "\nZ: 100%";
+		}
+
+
+		//if (e.component === IN.MOTION_ACCELERATION_MAGNITUDE) testElement.innerHTML = e.target.n + "<br>X: " + e.target.x + "<br>Y: " + e.target.y + "<br>Z: " + e.target.z + "<br><br>" + e.target.max;
 	}
 });
 
 var orientBinding = new input2.bind({
 	control: orientControl,
-	component: [IN.MOTION_ORIENTATION_X, IN.MOTION_ORIENTATION_Y],
-	target: { x: 0, y: 0, n: 0}
+	component: [IN.MOTION_ACCELERATION_X, IN.MOTION_ACCELERATION_Y, IN.MOTION_ACCELERATION_Z, IN.MOTION_ACCELERATION_MAGNITUDE],//[IN.MOTION_ORIENTATION_X, IN.MOTION_ORIENTATION_Y],
+	target: { x: 0, y: 0, z: 0, m: 0, n: 0, max: 0 }
 });
+
+function ffff(e) {
+	if (e.component === IN.MOTION_ORIENTATION_X) e.target.x = e.move.v;
+	if (e.component === IN.MOTION_ORIENTATION_Y) e.target.y = e.move.v;
+	if (e.component === IN.MOTION_ORIENTATION_Z) e.target.z = e.move.v;
+	if (e.component === IN.MOTION_ORIENTATION_MAGNITUDE) e.target.m = e.move.v;
+
+	if (e.move.v === 0) ++e.target.n;
+
+	document.getElementById('test2').innerHTML = e.target.n + "<br>X: " + e.target.x + "<br>Y: " + e.target.y + "<br>Z: " + e.target.z + "<br><br>" + IN.async[IN.MOTION_ORIENTATION_Z];
+};
+
+var rotationControl = new IN.Control({
+	move: ffff
+});
+
+var rotationBinding = new input2.bind({
+	control: rotationControl,
+	component: [IN.MOTION_ORIENTATION_X, IN.MOTION_ORIENTATION_Y, IN.MOTION_ORIENTATION_Z],//[IN.MOTION_ORIENTATION_X, IN.MOTION_ORIENTATION_Y],
+	target: { x: 0, y: 0, z: 0, m: 0, n: 0}
+});
+
 
 var c2 = new IN.Control({
 	press: function(e){
@@ -128,6 +160,8 @@ var c2 = new IN.Control({
 });
 
 function poop(e){
+	input2.calibratePosition();
+
 	if (e.component === smear.RADIAL_X) e.target.x = e.move.v;
 	else if (e.component === smear.RADIAL_Y) e.target.y = e.move.v;
 	else if (e.component === smear.PRESSURE) e.target.p = e.move.v;
@@ -153,7 +187,7 @@ var c = new IN.Control({
 var binding = input2.bind({
 	control: c,
 	target: { x: 0, y: 0 },
-	component: [smear.RADIAL_X, smear.RADIAL_Y]
+	component: [smear.RADIAL_X, smear.RADIAL_Y, smear.PRESSURE]
 });
 
 var binding2 = input2.bind({

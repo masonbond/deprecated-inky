@@ -13,16 +13,18 @@ var defaults = {
 	autoPoll: true,
 	dispatcherEnabled: true,
 	controlEnabled: true,
-	touchAreaEnabled: true,
+	
 	allowContextMenu: false,
 	allowMiddleMouseScroll: false,
 	allowSelect: false,
 	allowDrag: false,
 	allowFocusOnHover: true,
 	allowDefaultKeyboardEvents: false,
+	
 	analogDeadZone: .1,
 	analogThreshold: .01,
 	analogNormalized: true,
+	
 	deviceEnabled: true,
 	devicePollRate: 33,
 	deviceDeadZone: 0,
@@ -30,28 +32,51 @@ var defaults = {
 	deviceCapture: false,
 	deviceNormalized: true,
 	deviceComponentNormalized: true,
+	
+	touchAreaEnabled: true,
 	touchDeadZone: .1,
 	touchThreshold: .01,
 	touchSnap: true,
 	touchFloatOrigin: true,
 	touchAllowScrolling: false,
 	touchNormalized: true,
+
 	orientationXYThreshold: 0.01,
 	orientationXYDeadZone: 0.1,
 	orientationXYNormalized: false,
-	orientationZThreshold: 0.01,
-	orientationZDeadZone: 0.1,
+	orientationZThreshold: 0.02,
+	orientationZDeadZone: 0.5,
 	orientationZNormalized: false,
+
+	accelerationThreshold: 0.01,
+	accelerationDeadZone: 0.0625,
+
+	rotationThreshold: 0.25,
+	rotationDeadZone: 1.0,
+
+	velocityThreshold: 0.1,
+	velocityDeadZone: 0.2,
+
+	positionThreshold: 0.1,
+	positionDeadZone: 0.2
 };
 
-// TODO motion/acceleration
-// TODO put normalize1D(val, min, max) logic in helper func
-// TODO inconsistency with deadzone treatment and manual normalization?
+// TODO finish MOTION calibrations
+// TODO multiply device acceleration by deltaSeconds then transform by concatenated calibration * position matrices
+//		to get  velocity and then position?  don't just trea accel like velocity that's effed
+// TODO MOTION_ORIENTATION_MAGNITUDE
+// TODO deadZone wrapping for ORIENTATION_Z?
+// TODO 'normalize' acceleration, acceleration w/ gravity and rotation rate by subtracting components of deadZone-magnitude scaled version of itself
+// TODO MOTION_POSITION that takes orientation into account; this is what gets calibrated by calibratePosition
+// TODO radius fallback when pressure is undefined on touch events?
+//		gotta test this one as my phone's native radius->pressure simulation is weak as hell
+// TODO chaining for all objects
+// TODO inconsistency with deadzone treatment and manual normalization? wtf does this mean come on man
+// TODO re-test mouse move dx/dy compatibility after browserFamily removal
 // TODO mouse move custom args
 // TODO multitouch audit/necessary fixes
 // TODO onError callback for pointer lock requests
 // TODO way to select radial when rebinding, maybe group like components and give resolveConflict callback to bind?
-
 
 // static privates
 
@@ -68,11 +93,7 @@ function indexOfListener(obj, component, control) {
 function addListener(obj, component, listener, prepend) {
 	obj[component] = obj[component] || [];
 	if (indexOfListener(obj, component, listener.control) !== -1) return;
-	if (prepend) {
-		obj[component].unshift(listener);
-	} else {
-		obj[component].push(listener);
-	}
+	obj[component][prepend ? 'unshift' : 'push'](listener);
 }
 
 function removeListener(obj, component, listener, prepend) {
@@ -161,7 +182,7 @@ function beforeMove(event, component, args) {
 
 	return b.control.enabled
 		&& b.control.move
-		&& (component === pi.MOUSE_MOVE || b.timePressed[component] !== undefined)
+		// TODO can we ditch && (component === pi.MOUSE_MOVE || b.timePressed[component] !== undefined)
 		&& b.control.move.call(b, event);
 }
 
@@ -177,7 +198,7 @@ function raiseEvents(dispatcher, listeners, event, component, time, arg2) {
 			time: time === undefined ? UTILS.Timer.now() : time
 		}
 
-		event(e, component, arg2);
+		event(e, component, arg2)
 	}
 }
 
@@ -304,17 +325,6 @@ var pi = {
 		var derived = [0, 0, 0, 0];
 		var oldDerived = [0, 0, 0, 0];
 		var oldMX = undefined, oldMY = undefined;
-		var calibration = {
-				orientation: [0, 0, 0, 0],
-				acceleration: [0, 0, 0, 0],
-				accelerationGravity: [0, 0, 0, 0],
-				rotation: [0, 0, 0, 0]
-			};
-		var oldOrientation = [0, 0, 0];
-		var lastReportedOrientation = [0, 0, 0];
-		var acceleration = { old: [0, 0, 0, 0], cur: [0, 0, 0, 0] };
-		var accelerationGravity = { old: [0, 0, 0, 0], cur: [0, 0, 0, 0] };
-		var rotation = { old: [0, 0, 0, 0], cur: [0, 0, 0, 0] };
 
 		var rebindTarget = {
 			control: undefined,
@@ -441,12 +451,11 @@ var pi = {
 				var alreadyNormalized = result.analogNormalized && !componentNormalized;
 				var cur = curList[i].value === undefined ? curList[i] : curList[i].value;
 				var old = oldList[i];
-				var diff = cur - old;
 				var v = cur;
-				var dv = diff;
+				var dv = cur - old;
 				var range = 1 - result.analogDeadZone;
 
-				if (Math.abs(diff) >= result.analogThreshold) {
+				if (Math.abs(dv) >= result.analogThreshold) {
 					var padIndexComponent = pi.GAMEPAD + " " + deviceIndex + " " + code;
 
 					if (Math.abs(cur) > (alreadyNormalized ? 0 : result.analogDeadZone)) {
@@ -466,7 +475,7 @@ var pi = {
 						result.move(padIndexComponent, {v: v, dv: dv});
 					} else {
 						v = cur = pi.async[code] = pi.async[padIndexComponent] = 0;
-						dv = diff = -old;
+						dv = -old;
 
 						if (Math.abs(old) > 0) {
 							if (result.analogNormalized && componentNormalized) {
@@ -485,14 +494,26 @@ var pi = {
 			}
 		}
 
+		//
 		// orientation
+		//
+
+		var calibration = {
+				orientation: [0, 0, 0, 0],
+				acceleration: [0, 0, 0, 0],
+				accelerationIncludingGravity: [0, 0, 0, 0],
+				rotationRate: [0, 0, 0, 0],
+				positionMatrix: identityMatrix()
+			};
+		var oldOrientation = [0, 0, 0, 0];
+		var lastReportedOrientation = [0, 0, 0, 0];
 
 		window.addEventListener('deviceorientation', orientationInit);
 
 		function orientationInit(e) {
-			var x = pi.async[pi.MOTION_ORIENTATION_X] = lastReportedOrientation[0] = e.beta * constants.DEGREES_TO_RADIANS,
-				y = pi.async[pi.MOTION_ORIENTATION_Y] = lastReportedOrientation[1] = e.gamma * constants.DEGREES_TO_RADIANS,
-				z = pi.async[pi.MOTION_ORIENTATION_Z] = lastReportedOrientation[2] = e.alpha * constants.DEGREES_TO_RADIANS,
+			var x = pi.async[pi.MOTION_ORIENTATION_X] = (lastReportedOrientation[0] = e.beta * constants.DEGREES_TO_RADIANS) - calibration.orientation[0],
+				y = pi.async[pi.MOTION_ORIENTATION_Y] = (lastReportedOrientation[1] = e.gamma * constants.DEGREES_TO_RADIANS) - calibration.orientation[1],
+				z = pi.async[pi.MOTION_ORIENTATION_Z] = (lastReportedOrientation[2] = e.alpha * constants.DEGREES_TO_RADIANS) - calibration.orientation[2],
 				vx = Math.cos(y),
 				vy = Math.cos(x),
 				vz = Math.sin(y),
@@ -507,11 +528,13 @@ var pi = {
 
 			window.removeEventListener('deviceorientation', orientationInit);
 			window.addEventListener('deviceorientation', orientationHandler);
+
+			orientationHandler(e, true);
 		}
 
-		function orientationHandler(e) {
+		function orientationHandler(e, first) {
 			// we don't extend IN.Device for this because we want to normalize multiple axes
-			// that all have different input ranges
+			// that all have different input ranges 
 
 			lastReportedOrientation[0] = e.beta * constants.DEGREES_TO_RADIANS;
 			lastReportedOrientation[1] = e.gamma * constants.DEGREES_TO_RADIANS;
@@ -524,9 +547,9 @@ var pi = {
 				vy = Math.sin(x),
 				vz = Math.sin(y),
 				vl = Math.sqrt(vx * vx + vy * vy + vz * vz),
-				xOld = pi.async[pi.MOTION_ORIENTATION_X] - calibration.orientation[0],
-				yOld = pi.async[pi.MOTION_ORIENTATION_Y] - calibration.orientation[1],
-				zOld = pi.async[pi.MOTION_ORIENTATION_Z] - calibration.orientation[2],
+				xOld = pi.async[pi.MOTION_ORIENTATION_X],
+				yOld = pi.async[pi.MOTION_ORIENTATION_Y],
+				zOld = pi.async[pi.MOTION_ORIENTATION_Z],
 				dx,
 				dy,
 				dz,
@@ -534,6 +557,10 @@ var pi = {
 				vyOld = oldOrientation[1],
 				vzOld = oldOrientation[2],
 				angleDiff;
+
+			// update position matrix!
+
+			buildRotationMatrix(x, y, z, result.positionMatrix);
 
 			// x/y orientation handling
 
@@ -544,7 +571,7 @@ var pi = {
 			// measure of angle between this and last x/y orientation
 			angleDiff = Math.acos(Math.max(-1, Math.min(1, vx * vxOld + vy * vyOld + vz * vzOld)));
 
-			if (angleDiff > result.orientationXYThreshold) {
+			if (first || angleDiff > result.orientationXYThreshold) {
 				var vxNeutral = Math.cos(calibration.orientation[1]),
 					vyNeutral = Math.sin(calibration.orientation[0]),
 					vzNeutral = Math.sin(calibration.orientation[1]),
@@ -575,7 +602,7 @@ var pi = {
 				dy = y - yOld;
 
 				if (Math.abs(x) > constants.HALF_PI || angleFromCenter > result.orientationXYDeadZone) {
-					if (oldOrientation[3] <= result.orientationXYDeadZone) {
+					if (first || oldOrientation[3] <= result.orientationXYDeadZone) {
 						result.press(pi.MOTION_ORIENTATION_X);
 						result.press(pi.MOTION_ORIENTATION_Y);
 					}
@@ -594,17 +621,17 @@ var pi = {
 					dy = -y;
 					x = y = 0;
 
-					if (oldOrientation[3] > 0) {
+					if (oldOrientation[3] >= result.orientationXYDeadZone) {
 						if (result.orientationXYNormalized) {
 							dx = -(xOld > 0 ? Math.max(0, (xOld - result.orientationXYDeadZone) / angleRangeX) : Math.min(0, (xOld + result.orientationXYDeadZone) / angleRangeX));
 							dy = -(yOld > 0 ? Math.max(0, (yOld - result.orientationXYDeadZone) / angleRangeY) : Math.min(0, (yOld + result.orientationXYDeadZone) / angleRangeY));
 						}
 
 						result.move(pi.MOTION_ORIENTATION_X, { v: x, dv: dx });
-						result.release(pi.MOTION_ORIENTATION_X);
+						if (!first) result.release(pi.MOTION_ORIENTATION_X);
 						
 						result.move(pi.MOTION_ORIENTATION_Y, { v: y, dv: dy });
-						result.release(pi.MOTION_ORIENTATION_X);
+						if (!first) result.release(pi.MOTION_ORIENTATION_X);
 					}
 				}
 
@@ -612,11 +639,12 @@ var pi = {
 				// TODO will this work after recalibration?
 				oldOrientation[0] = vx;
 				oldOrientation[1] = vy;
+				oldOrientation[2] = vz;
 				oldOrientation[3] = angleFromCenter;
 
 				// store non-normalized values in async table
-				pi.async[pi.MOTION_ORIENTATION_X] = lastReportedOrientation[0];
-				pi.async[pi.MOTION_ORIENTATION_Y] = lastReportedOrientation[1];
+				pi.async[pi.MOTION_ORIENTATION_X] = x;
+				pi.async[pi.MOTION_ORIENTATION_Y] = y;
 			}
 
 			// z orientation handling
@@ -628,14 +656,15 @@ var pi = {
 
 			dz = z - zOld;
 
-			var zDiff = Math.abs(dz),
-				zOld = oldOrientation[2];
+			var zDiff = Math.abs(dz);
 
-			if (zDiff > result.orientationZThreshold) {
+			if (first || zDiff > result.orientationZThreshold) {
 				var angleRangeZ = constants.DOUBLE_PI - result.orientationZDeadZone;
 
-				if (zDiff > result.orientationZDeadZone) {
-					if (Math.abs(zOld) <= result.orientationZDeadZone) result.press(pi.MOTION_ORIENTATION_Z);
+				if (Math.abs(z) > result.orientationZDeadZone) {
+					if (first || Math.abs(zOld) <= result.orientationZDeadZone) {
+						result.press(pi.MOTION_ORIENTATION_Z);
+					}
 
 					if (result.orientationZNormalized) {
 						z = z > 0 ? Math.max(0, (z - result.orientationZDeadZone) / angleRangeZ) : Math.min(0, (z + result.orientationZDeadZone) / angleRangeZ);
@@ -647,30 +676,255 @@ var pi = {
 					z = 0;
 					dz = -zOld;
 
-					if (Math.abs(zOld) > 0) {
+					if (Math.abs(zOld) > result.orientationZDeadZone) {
 						if (result.orientationZNormalized) {
 							dz = -(zOld > 0 ? Math.max(0, (zOld - result.orientationZDeadZone) / angleRangeZ) : Math.min(0, (zOld + result.orientationZDeadZone) / angleRangeZ));
 						}
 
 						result.move(pi.MOTION_ORIENTATION_Z, { v: z, dv: dz });
-						result.release(pi.MOTION_ORIENTATION_Z);
+						if (!first) result.release(pi.MOTION_ORIENTATION_Z);
 					}
 				}
 
 				// update "old" values
 
-				oldOrientation[2] = vz;
-
-				pi.async[pi.MOTION_ORIENTATION_Z] = lastReportedOrientation[2];
+				pi.async[pi.MOTION_ORIENTATION_Z] = z;
 			}
 		}
 
+		//
 		// motion
+		//
 
-		window.addEventListener('devicemotion', motionHandler);
+		var lastMotionTime;
+		var motionTime;
+		var deltaSeconds;
 
-		function motionHandler(e) {
+		var combinedPositionMatrix = [
+			0, 0, 0, 0,
+			0, 0, 0, 0,
+			0, 0, 0, 0,
+			0, 0, 0, 0
+		];
 
+		var acceleration = [0, 0, 0, 0];
+		var accelerationIncludingGravity = [0, 0, 0, 0];
+		var rotationRate = [0, 0, 0, 0];
+		var transformedAcceleration = [0, 0, 0, 0];
+		var velocityDelta = [0, 0, 0, 0];
+		var velocity = [0, 0, 0, 0];
+		var positionDelta = [0, 0, 0, 0];
+		var position = [0, 0, 0, 0];
+
+		var oldAcceleration = [0, 0, 0, 0];
+		var oldAccelerationIncludingGravity = [0, 0, 0, 0];
+		var oldRotationRate = [0, 0, 0, 0];
+
+		var lastReportedAcceleration = [0, 0, 0, 0];
+		var lastReportedAccelerationIncludingGravity = [0, 0, 0, 0];
+		var lastReportedRotationRate = [0, 0, 0, 0];
+
+		window.addEventListener('devicemotion', motionInit);
+
+		function identityMatrix() {
+			return [
+				1, 0, 0, 0,
+				0, 1, 0, 0,
+				0, 0, 1, 0,
+				0, 0, 0, 1
+			];
+		}
+
+		function buildRotationMatrix(x, y, z, result) {
+			var cx = Math.cos(x),
+				sx = Math.sin(x),
+				cy = Math.cos(y),
+				sy = Math.sin(y),
+				cz = Math.cos(z),
+				sz = Math.sin(z),
+				cycz = cy * cz,
+				cysz = cy * sz;
+
+			result[0] = cx * cycz - sx * sz;
+			result[1] = cx * cysz + sx * cz;
+			result[2] = -cx * sy;
+
+			result[4] = -sx * cycz - cx * sz;
+			result[5] = -sx * cysz + cx * cz;
+			result[6] = sx * sy;
+
+			result[8] = sy * cz;
+			result[9] = sy * sz;
+			result[10] = cy;
+		}
+
+		/* TODO do we need this now?
+		function concatenateMatrices(a, b, result) {
+			result[0] = a[0] * b[0] + a[1] * b[4] + a[2] * b[8] + a[3] * b[12];
+			result[1] = a[0] * b[1] + a[1] * b[5] + a[2] * b[9] + a[3] * b[13];
+			result[2] = a[0] * b[2] + a[1] * b[6] + a[2] * b[10] + a[3] * b[14];
+			result[3] = a[0] * b[3] + a[1] * b[7] + a[2] * b[11] + a[3] * b[15];
+
+			result[4] = a[4] * b[0] + a[5] * b[4] + a[6] * b[8] + a[7] * b[12];
+			result[5] = a[4] * b[1] + a[5] * b[5] + a[6] * b[9] + a[7] * b[13];
+			result[6] = a[4] * b[2] + a[5] * b[6] + a[6] * b[10] + a[7] * b[14];
+			result[7] = a[4] * b[3] + a[5] * b[7] + a[6] * b[11] + a[7] * b[15];
+
+			result[8] = a[8] * b[0] + a[9] * b[4] + a[10] * b[8] + a[11] * b[12];
+			result[9] = a[8] * b[1] + a[9] * b[5] + a[10] * b[9] + a[11] * b[13];
+			result[10] = a[8] * b[2] + a[9] * b[6] + a[10] * b[10] + a[11] * b[14];
+			result[11] = a[8] * b[3] + a[9] * b[7] + a[10] * b[11] + a[11] * b[15];
+
+			result[12] = a[12] * b[0] + a[13] * b[4] + a[14] * b[8] + a[15] * b[12];
+			result[13] = a[12] * b[1] + a[13] * b[5] + a[14] * b[9] + a[15] * b[13];
+			result[14] = a[12] * b[2] + a[13] * b[6] + a[14] * b[10] + a[15] * b[14];
+			result[15] = a[12] * b[3] + a[13] * b[7] + a[14] * b[11] + a[15] * b[15];
+		} //*/
+
+		function multiplyMatrixByVector(m, v, result) {
+			// TODO test row/column cardinality
+			result[0] = m[0] * v[0] + m[1] * v[1] + m[2] * v[2] + m[3];
+			result[1] = m[4] * v[0] + m[5] * v[1] + m[6] * v[2] + m[7];
+			result[2] = m[8] * v[0] + m[9] * v[1] + m[10] * v[2] + m[11];
+		}
+
+		function scaleVector(v, s, result) {
+			result[0] = v[0] * s;
+			result[1] = v[1] * s;
+			result[2] = v[2] * s;
+			result[3] = v[3] * s;
+		}
+
+		function subtractVectors(a, b, result) {
+			result[0] = a[0] - b[0];
+			result[1] = a[1] - b[1];
+			result[2] = a[2] - b[2];
+		}
+
+		function addVectors(a, b, result) {
+			result[0] = a[0] + b[0];
+			result[1] = a[1] + b[1];
+			result[2] = a[2] + b[2];
+		}
+
+		function vectorMagnitude(v) {
+			return Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+		}
+
+		// TODO can actually factor this cleanly
+
+		function motionInit(e) {
+			var interval = e.interval || 0;
+			deltaSeconds = interval * 1000;
+
+			lastMotionTime = UTILS.Timer.now() - interval;
+
+			pi.async[pi.MOTION_ACCELERATION_X] = (lastReportedAcceleration[0] = e.acceleration.x) - calibration.acceleration[0];
+			pi.async[pi.MOTION_ACCELERATION_Y] = (lastReportedAcceleration[1] = e.acceleration.y) - calibration.acceleration[1];
+			pi.async[pi.MOTION_ACCELERATION_Z] = (lastReportedAcceleration[2] = e.acceleration.z) - calibration.acceleration[2];
+			
+			pi.async[pi.MOTION_ACCELERATION_WITH_GRAVITY_X] = (lastReportedAccelerationIncludingGravity[0] = e.accelerationIncludingGravity.x) - calibration.accelerationIncludingGravity[0];
+			pi.async[pi.MOTION_ACCELERATION_WITH_GRAVITY_Y] = (lastReportedAccelerationIncludingGravity[1] = e.accelerationIncludingGravity.y) - calibration.accelerationIncludingGravity[1];
+			pi.async[pi.MOTION_ACCELERATION_WITH_GRAVITY_Z] = (lastReportedAccelerationIncludingGravity[2] = e.accelerationIncludingGravity.z) - calibration.accelerationIncludingGravity[2];
+			
+			pi.async[pi.MOTION_ROTATION_X] = (lastReportedRotationRate[0] = e.rotationRate.gamma) - calibration.rotationRate[0];
+			pi.async[pi.MOTION_ROTATION_Y] = (lastReportedRotationRate[1] = e.rotationRate.beta) - calibration.rotationRate[1];
+			pi.async[pi.MOTION_ROTATION_Z] = (lastReportedRotationRate[2] = e.rotationRate.alpha) - calibration.rotationRate[2];
+
+			pi.async[pi.MOTION_ACCELERATION_MAGNITUDE] = vectorMagnitude(lastReportedAcceleration);
+			pi.async[pi.MOTION_ACCELERATION_INCLUDING_GRAVITY_MAGNITUDE] = vectorMagnitude(lastReportedAccelerationIncludingGravity);
+			pi.async[pi.MOTION_ROTATION_MAGNITUDE] = vectorMagnitude(lastReportedRotationRate);
+
+			pi.async[pi.MOTION_VELOCITY_X] = velocity[0] += acceleration[0] * deltaSeconds;
+			pi.async[pi.MOTION_VELOCITY_Y] = velocity[1] += acceleration[1] * deltaSeconds;
+			pi.async[pi.MOTION_VELOCITY_Z] = velocity[2] += acceleration[2] * deltaSeconds;
+			pi.async[pi.MOTION_VELOCITY_MAGNITUDE] = vectorMagnitude(velocity);
+
+			pi.async[pi.MOTION_POSITION_X] = 0;
+			pi.async[pi.MOTION_POSITION_Y] = 0;
+			pi.async[pi.MOTION_POSITION_Z] = 0;
+			pi.async[pi.MOTION_POSITION_MAGNITUDE] = 0;
+
+			window.removeEventListener('devicemotion', motionInit);
+			window.addEventListener('devicemotion', motionHandler);
+
+			motionHandler(e, true);
+		}
+
+		function motionHandler(e, first) {
+			motionTime = UTILS.Timer.now();
+			deltaSeconds = (motionTime - lastMotionTime) * 1000;
+
+			lastReportedAcceleration[0] = e.acceleration.x;
+			lastReportedAcceleration[1] = e.acceleration.y;
+			lastReportedAcceleration[2] = e.acceleration.z;
+			
+			lastReportedAccelerationIncludingGravity[0] = e.accelerationIncludingGravity.x;
+			lastReportedAccelerationIncludingGravity[1] = e.accelerationIncludingGravity.y;
+			lastReportedAccelerationIncludingGravity[2] = e.accelerationIncludingGravity.z;
+
+			lastReportedRotationRate[0] = e.rotationRate.alpha;
+			lastReportedRotationRate[1] = e.rotationRate.beta;
+			lastReportedRotationRate[2] = e.rotationRate.gamma;
+
+			// adjust for calibration
+
+			subtractVectors(lastReportedAcceleration, calibration.acceleration, acceleration);
+			subtractVectors(lastReportedAccelerationIncludingGravity, calibration.accelerationIncludingGravity, accelerationIncludingGravity);
+			subtractVectors(lastReportedRotationRate, calibration.rotationRate, rotationRate);
+
+			acceleration[3] = vectorMagnitude(lastReportedAcceleration);
+			accelerationIncludingGravity[3] = vectorMagnitude(lastReportedAccelerationIncludingGravity);
+			rotationRate[3] = vectorMagnitude(lastReportedRotationRate);
+
+			handle3DMotion(acceleration, accelerationCodes, result.accelerationDeadZone, result.accelerationThreshold, first);
+			handle3DMotion(accelerationIncludingGravity, accelerationIncludingGravityCodes, result.accelerationDeadZone, result.accelerationThreshold, first);
+			handle3DMotion(rotationRate, rotationRateCodes, result.rotationDeadZone, result.rotationThreshold, first);
+
+			// free-orientation position based on calibrated motion/orientation
+
+			multiplyMatrixByVector(result.positionMatrix, acceleration, transformedAcceleration);
+
+			scaleVector(transformedAcceleration, deltaSeconds, velocityDelta);
+			addVectors(velocity, velocityDelta, velocity);
+
+			scaleVector(velocity, deltaSeconds, positionDelta);
+			addVectors(position, positionDelta, position);
+
+			velocity[3] = vectorMagnitude(velocity);
+			position[3] = vectorMagnitude(position);
+
+			handle3DMotion(velocity, velocityCodes, result.velocityDeadZone, result.velocityThreshold, first);
+			handle3DMotion(position, positionCodes, result.positionDeadZone, result.positionThreshold, first);
+
+			lastMotionTime = motionTime;
+		}
+
+		function handle3DMotion(values, codes, deadZone, threshold, first) {
+			var magnitude = values[3];
+			var oldMagnitude = pi.async[codes[3]];
+			var i;
+
+			if (!first && Math.abs(magnitude - oldMagnitude) < threshold) return;
+
+			if (magnitude >= deadZone) {
+
+				for (i = 0; i < 4; ++i) {
+					if (first || oldMagnitude < deadZone) {
+						pi.press(codes[i]);
+					}
+
+					pi.move(codes[i], { v: values[i], dv: values[i] - pi.async[codes[i]] });
+					pi.async[codes[i]] = values[i];
+				}
+			} else if (oldMagnitude >= deadZone) {
+				for (i = 0; i < 4; ++i) {
+					values[i] = 0;
+					pi.move(codes[i], { v: 0, dv: -pi.async[codes[i]] });
+					if (!first) pi.release(codes[i]);
+					pi.async[codes[i]] = values[i];
+				}
+			}
 		}
 
 		// mouse
@@ -682,14 +936,14 @@ var pi = {
 
 			var dx, dy;
 
-			if (UTILS.browserFamily === "ie") {
+			dx = e.movementX || e.webkitMovementX || e.mozMovementX;
+			dy = e.movementY || e.webkitMovementY || e.mozMovementY;
+
+			if (dx === undefined || dy === undefined) {
 				dx = (oldMX !== undefined) && (e.offsetX - oldMX) || 0;
-				dy = (oldMY !== undefined) && (e.offsetY - oldMY) || 0;	
+				dy = (oldMY !== undefined) && (e.offsetY - oldMY) || 0;
 				oldMX = e.offsetX;
 				oldMY = e.offsetY;
-			} else {
-				dx = e.movementX || e.webkitMovementX || e.mozMovementX || 0;
-				dy = e.movementY || e.webkitMovementY || e.mozMovementY || 0;
 			}
 
 			result.move(
@@ -864,6 +1118,22 @@ var pi = {
 			orientationXYNormalized: args && args.orientationXYNormalized !== undefined ? args.orientationXYNormalized : defaults.orientationXYNormalized,
 			orientationZNormalized: args && args.orientationZNormalized !== undefined ? args.orientationZNormalized : defaults.orientationZNormalized,
 			
+			accelerationDeadZone: args && args.accelerationDeadZone !== undefined ? args.accelerationDeadZone : defaults.accelerationDeadZone,
+			accelerationThreshold: args && args.accelerationThreshold !== undefined ? args.accelerationThreshold : defaults.accelerationThreshold,
+
+			rotationDeadZone: args && args.rotationDeadZone !== undefined ? args.rotationDeadZone : defaults.rotationDeadZone,
+			rotationThreshold: args && args.rotationThreshold !== undefined ? args.rotationThreshold : defaults.rotationThreshold,
+
+			velocityDeadZone: args && args.velocityDeadZone !== undefined ? args.velocityDeadZone : defaults.velocityDeadZone,
+			velocityThreshold: args && args.velocityThreshold !== undefined ? args.velocityThreshold : defaults.velocityThreshold,
+
+			positionDeadZone: args && args.positionDeadZone !== undefined ? args.positionDeadZone : defaults.positionDeadZone,
+			positionThreshold: args && args.positionThreshold !== undefined ? args.positionThreshold : defaults.positionThreshold,
+
+			// TODO pros/cons of exposing this here? 
+
+			positionMatrix: identityMatrix(),
+
 			allowContextMenu: args && args.allowContextMenu !== undefined ? args.allowContextMenu : defaults.allowContextMenu,
 			allowMiddleMouseScroll: args && args.allowMiddleMouseScroll !== undefined ? args.allowMiddleMouseScroll : defaults.allowMiddleMouseScroll,
 			allowSelect: args && args.allowSelect !== undefined ? args.allowSelect : defaults.allowSelect,
@@ -923,15 +1193,20 @@ var pi = {
 				if (pointerLockElement === oldTargetElement) IN.Mouse.exitPointerLock(onExit);
 			},
 			calibrateOrientation: function(x, y, z) {
-				if (arguments.length < 3) {
-					calibration.orientation[0] = lastReportedOrientation[0];
-					calibration.orientation[1] = lastReportedOrientation[1];
-					calibration.orientation[2] = lastReportedOrientation[2];
-				} else {
-					calibration.orientation[0] = x;
-					calibration.orientation[1] = y;
-					calibration.orientation[2] = z;
-				}
+				if (x !== false) calibration.orientation[0] = (x === undefined || x === true) ? lastReportedOrientation[0] : x;
+				if (y !== false) calibration.orientation[1] = (y === undefined || y === true) ? lastReportedOrientation[1] : y;
+				if (z !== false) calibration.orientation[2] = (z === undefined || z === true) ? lastReportedOrientation[2] : z;
+			},
+			calibrateAcceleration: function(x, y, z) {
+				// TODO measure effects on velocity? maybe need to calibrate that separately
+				if (x !== false) calibration.acceleration[0] = (x === undefined || x === true) ? lastReportedAcceleration[0] : x;
+				if (y !== false) calibration.acceleration[1] = (y === undefined || y === true) ? lastReportedAcceleration[1] : y;
+				if (z !== false) calibration.acceleration[2] = (z === undefined || z === true) ? lastReportedAcceleration[2] : z;
+			},
+			calibratePosition: function(x, y, z) {
+				if (x !== false) calibration.positionMatrix[4] = (x === undefined || x === true) ? position[0] : x;
+				if (y !== false) calibration.positionMatrix[8] = (y === undefined || y === true) ? position[1] : y;
+				if (z !== false) calibration.positionMatrix[12] = (z === undefined || z === true) ? position[2] : z;
 			},
 			poll: function() {
 				// see if result.element changed on us
@@ -944,9 +1219,7 @@ var pi = {
 				if (!result.enabled) return;
 
 				// raise hold events on active components
-				for (var component in pi.async) {
-					this.hold(component);
-				}
+				for (var component in pi.async) this.hold(component);
 
 				pollGamepads();
 			}
@@ -1249,18 +1522,34 @@ var components = {
 	MOTION_ORIENTATION_X: "Orientation X",
 	MOTION_ORIENTATION_Y: "Orientation Y",
 	MOTION_ORIENTATION_Z: "Orientation Z",
+	MOTION_ORIENTATION_MAGNITUDE: "Orientation Magnitude",
 
 	MOTION_ACCELERATION_X: "Acceleration X",
 	MOTION_ACCELERATION_Y: "Acceleration Y",
 	MOTION_ACCELERATION_Z: "Acceleration Z",
+	MOTION_ACCELERATION_MAGNITUDE: "Acceleration Magnitude",
 
 	MOTION_ACCELERATION_WITH_GRAVITY_X: "Acceleration with Gravity X",
 	MOTION_ACCELERATION_WITH_GRAVITY_Y: "Acceleration with Gravity Y",
 	MOTION_ACCELERATION_WITH_GRAVITY_Z: "Acceleration with Gravity Z",
+	MOTION_ACCELERATION_WITH_GRAVITY_MAGNITUDE: "Acceleration with Gravity Magnitude",
 
 	MOTION_ROTATION_X: "Rotational Speed X",
 	MOTION_ROTATION_Y: "Rotational Speed Y",
 	MOTION_ROTATION_Z: "Rotational Speed Z",
+	MOTION_ROTATION_MAGNITUDE: "Rotational Speed Magnitude",
+
+	// derived motion
+
+	MOTION_VELOCITY_X: "Velocity X",
+	MOTION_VELOCITY_Y: "Velocity Y",
+	MOTION_VELOCITY_Z: "Velocity Z",
+	MOTION_VELOCITY_MAGNITUDE: "Velocity Magnitude",
+
+	MOTION_POSITION_X: "Position X",
+	MOTION_POSITION_Y: "Position Y",
+	MOTION_POSITION_Z: "Position Z",
+	MOTION_POSITION_MAGNITUDE: "Position Magnitude",
 
 	// mouse
 
@@ -1606,6 +1895,45 @@ var derivedCodes = [
 	pi.GAMEPAD_LEFT_STICK_RADIAL_Y,
 	pi.GAMEPAD_RIGHT_STICK_RADIAL_X,
 	pi.GAMEPAD_RIGHT_STICK_RADIAL_Y
+];
+
+// motion codes
+
+var accelerationCodes = [
+	pi.MOTION_ACCELERATION_X,
+	pi.MOTION_ACCELERATION_Y,
+	pi.MOTION_ACCELERATION_Z,
+	pi.MOTION_ACCELERATION_MAGNITUDE
+];
+
+var accelerationIncludingGravityCodes = [
+	pi.MOTION_ACCELERATION_WITH_GRAVITY_X,
+	pi.MOTION_ACCELERATION_WITH_GRAVITY_Y,
+	pi.MOTION_ACCELERATION_WITH_GRAVITY_Z,
+	pi.MOTION_ACCELERATION_WITH_GRAVITY_MAGNITUDE
+];
+
+var rotationRateCodes = [
+	pi.MOTION_ROTATION_X,
+	pi.MOTION_ROTATION_Y,
+	pi.MOTION_ROTATION_Z,
+	pi.MOTION_ROTATION_MAGNITUDE
+];
+
+// derived motion codes
+
+var velocityCodes = [
+	pi.MOTION_VELOCITY_X,
+	pi.MOTION_VELOCITY_Y,
+	pi.MOTION_VELOCITY_Z,
+	pi.MOTION_VELOCITY_MAGNITUDE
+];
+
+var positionCodes = [
+	pi.MOTION_POSITION_X,
+	pi.MOTION_POSITION_Y,
+	pi.MOTION_POSITION_Z,
+	pi.MOTION_POSITION_MAGNITUDE
 ];
 
 return pi;
