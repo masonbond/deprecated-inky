@@ -13,6 +13,7 @@ body {
 
 .test {
 	font-family: monospace;
+	white-space: pre-line;
 	position: relative;
 	width: 300px;
 	height: 300px;
@@ -20,6 +21,7 @@ body {
 }
 
 #smear {
+	display: none;
 background: #222;
 border-radius: 50%;
 width: 400px;
@@ -87,49 +89,44 @@ console.log("smear", smear);
 
 var t2 = {val:0,times:[]};
 
-setTimeout(function() {	document.getElementById('test2').innerHTML = 'CALIBRATED ROTATION';	input2.calibratePosition(); }, 000);
+//setTimeout(function() {	document.getElementById('test2').innerHTML = 'CALIBRATED ROTATION';	input2.calibratePosition(); }, 000);
 
 var orientControl = new IN.Control({
 	move: function(e) {
+		if (e.component === IN.MOTION_POSITION_X) e.target.x = e.move.v;
+		if (e.component === IN.MOTION_POSITION_Y) e.target.y = e.move.v;
+		if (e.component === IN.MOTION_POSITION_Z) e.target.z = e.move.v;
+		if (e.component === IN.MOTION_POSITION_MAGNITUDE) e.target.m = e.move.v;
 
-		if (e.component === IN.MOTION_ACCELERATION_X) e.target.x += Math.abs(e.move.v);
-		if (e.component === IN.MOTION_ACCELERATION_Y) e.target.y += Math.abs(e.move.v);
-		if (e.component === IN.MOTION_ACCELERATION_Z) e.target.z += Math.abs(e.move.v);
-		if (e.component === IN.MOTION_ACCELERATION_MAGNITUDE) e.target.m = Math.abs(e.move.v);
+		if (Math.abs(e.target.x) > Math.abs(e.target.y) && Math.abs(e.target.x) > Math.abs(e.target.z)) e.target.n = "X";
+		else if (Math.abs(e.target.y) > Math.abs(e.target.x) && Math.abs(e.target.y) > Math.abs(e.target.z)) e.target.n = "Y";
+		else if (Math.abs(e.target.z) > Math.abs(e.target.y) && Math.abs(e.target.z) > Math.abs(e.target.x)) e.target.n = "Z";
+		else e.target.n = '';
 
-		if (e.move.v === 0) ++e.target.n;
-
-		if (e.target.x > e.target.y &&
-			e.target.x > e.target.z) {
-			testElement.innerHTML = "a: 100%\nY: " + parseInt(100 * e.target.y / e.target.x, 10) + "%\nZ: " + parseInt(100 * e.target.z / e.target.x, 10) + "%";
-		} else if (e.target.y > e.target.z &&
-		    	 e.target.y > e.target.x) {
-			testElement.innerHTML = "a: " + parseInt(100 * e.target.x / e.target.y, 10) + "%\nY: 100%\nZ: " + parseInt(100 * e.target.z / e.target.y, 10) + "%";
-		} else if (e.target.z > e.target.y &&
-			e.target.z > e.target.x) {
-			testElement.innerHTML = "a: " + parseInt(100 * e.target.x / e.target.z, 10) + "%\nY: " + parseInt(100 * e.target.y / e.target.z, 10) + "\nZ: 100%";
-		}
-
-
-		//if (e.component === IN.MOTION_ACCELERATION_MAGNITUDE) testElement.innerHTML = e.target.n + "<br>X: " + e.target.x + "<br>Y: " + e.target.y + "<br>Z: " + e.target.z + "<br><br>" + e.target.max;
+		testElement.innerHTML = JSON.stringify(e.target, null, 4);
 	}
 });
 
 var orientBinding = new input2.bind({
 	control: orientControl,
-	component: [IN.MOTION_ACCELERATION_X, IN.MOTION_ACCELERATION_Y, IN.MOTION_ACCELERATION_Z, IN.MOTION_ACCELERATION_MAGNITUDE],//[IN.MOTION_ORIENTATION_X, IN.MOTION_ORIENTATION_Y],
+	component: [IN.MOTION_POSITION_X, IN.MOTION_POSITION_Y, IN.MOTION_POSITION_Z, IN.MOTION_POSITION_MAGNITUDE],//[IN.MOTION_POSITION_X, IN.MOTION_POSITION_Y],
 	target: { x: 0, y: 0, z: 0, m: 0, n: 0, max: 0 }
 });
 
 function ffff(e) {
-	if (e.component === IN.MOTION_ORIENTATION_X) e.target.x = e.move.v;
-	if (e.component === IN.MOTION_ORIENTATION_Y) e.target.y = e.move.v;
-	if (e.component === IN.MOTION_ORIENTATION_Z) e.target.z = e.move.v;
-	if (e.component === IN.MOTION_ORIENTATION_MAGNITUDE) e.target.m = e.move.v;
+		if (e.component === IN.MOTION_VELOCITY_X) {
+			e.target.x = (e.move.v);
+			e.target.cumulative = (e.target.cumulative || 0) + e.target.x;
+		}
+		if (e.component === IN.MOTION_VELOCITY_Y) e.target.y = (e.move.v);
+		if (e.component === IN.MOTION_VELOCITY_Z) e.target.z = (e.move.v);
+		if (e.component === IN.MOTION_VELOCITY_MAGNITUDE) e.target.m = (e.move.v);
 
-	if (e.move.v === 0) ++e.target.n;
+		if (e.target.x > e.target.y && e.target.x > e.target.z) e.target.n = "X";
+		else if (e.target.y > e.target.x && e.target.y > e.target.z) e.target.n = "Y";
+		else if (e.target.z > e.target.y && e.target.z > e.target.x) e.target.n = "Z";
 
-	document.getElementById('test2').innerHTML = e.target.n + "<br>X: " + e.target.x + "<br>Y: " + e.target.y + "<br>Z: " + e.target.z + "<br><br>" + IN.async[IN.MOTION_ORIENTATION_Z];
+		document.querySelector("#test2").innerHTML = JSON.stringify(e.target, null, 4);
 };
 
 var rotationControl = new IN.Control({
@@ -138,8 +135,8 @@ var rotationControl = new IN.Control({
 
 var rotationBinding = new input2.bind({
 	control: rotationControl,
-	component: [IN.MOTION_ORIENTATION_X, IN.MOTION_ORIENTATION_Y, IN.MOTION_ORIENTATION_Z],//[IN.MOTION_ORIENTATION_X, IN.MOTION_ORIENTATION_Y],
-	target: { x: 0, y: 0, z: 0, m: 0, n: 0}
+	component: [IN.MOTION_VELOCITY_X, IN.MOTION_VELOCITY_Y, IN.MOTION_VELOCITY_Z],//[IN.MOTION_POSITION_X, IN.MOTION_POSITION_Y],
+	target: { x: 0, y: 0, z: 0, m: 0, n: 0, smooth: []}
 });
 
 
@@ -160,7 +157,7 @@ var c2 = new IN.Control({
 });
 
 function poop(e){
-	input2.calibratePosition();
+	//input2.calibratePosition();
 
 	if (e.component === smear.RADIAL_X) e.target.x = e.move.v;
 	else if (e.component === smear.RADIAL_Y) e.target.y = e.move.v;

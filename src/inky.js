@@ -49,21 +49,18 @@ var defaults = {
 	orientationZNormalized: false,
 
 	accelerationThreshold: 0.01,
-	accelerationDeadZone: 0.0625,
+	accelerationDeadZone: 0.0,
 
 	rotationThreshold: 0.25,
 	rotationDeadZone: 1.0,
 
-	velocityThreshold: 0.1,
-	velocityDeadZone: 0.2,
+	velocityThreshold: 0.001,
+	velocityDeadZone: 0.05,
 
-	positionThreshold: 0.1,
-	positionDeadZone: 0.2
+	positionThreshold: 0.001,
+	positionDeadZone: 0.0
 };
 
-// TODO finish MOTION calibrations
-// TODO multiply device acceleration by deltaSeconds then transform by concatenated calibration * position matrices
-//		to get  velocity and then position?  don't just trea accel like velocity that's effed
 // TODO MOTION_ORIENTATION_MAGNITUDE
 // TODO deadZone wrapping for ORIENTATION_Z?
 // TODO 'normalize' acceleration, acceleration w/ gravity and rotation rate by subtracting components of deadZone-magnitude scaled version of itself
@@ -700,19 +697,17 @@ var pi = {
 		var motionTime;
 		var deltaSeconds;
 
-		var combinedPositionMatrix = [
-			0, 0, 0, 0,
-			0, 0, 0, 0,
-			0, 0, 0, 0,
-			0, 0, 0, 0
-		];
-
 		var acceleration = [0, 0, 0, 0];
 		var accelerationIncludingGravity = [0, 0, 0, 0];
+
 		var rotationRate = [0, 0, 0, 0];
 		var transformedAcceleration = [0, 0, 0, 0];
+
+		var oldVelocityDelta = [0, 0, 0, 0];
 		var velocityDelta = [0, 0, 0, 0];
 		var velocity = [0, 0, 0, 0];
+
+		var oldPositionDelta = [0, 0, 0, 0];
 		var positionDelta = [0, 0, 0, 0];
 		var position = [0, 0, 0, 0];
 
@@ -758,34 +753,18 @@ var pi = {
 			result[10] = cy;
 		}
 
-		/* TODO do we need this now?
-		function concatenateMatrices(a, b, result) {
-			result[0] = a[0] * b[0] + a[1] * b[4] + a[2] * b[8] + a[3] * b[12];
-			result[1] = a[0] * b[1] + a[1] * b[5] + a[2] * b[9] + a[3] * b[13];
-			result[2] = a[0] * b[2] + a[1] * b[6] + a[2] * b[10] + a[3] * b[14];
-			result[3] = a[0] * b[3] + a[1] * b[7] + a[2] * b[11] + a[3] * b[15];
-
-			result[4] = a[4] * b[0] + a[5] * b[4] + a[6] * b[8] + a[7] * b[12];
-			result[5] = a[4] * b[1] + a[5] * b[5] + a[6] * b[9] + a[7] * b[13];
-			result[6] = a[4] * b[2] + a[5] * b[6] + a[6] * b[10] + a[7] * b[14];
-			result[7] = a[4] * b[3] + a[5] * b[7] + a[6] * b[11] + a[7] * b[15];
-
-			result[8] = a[8] * b[0] + a[9] * b[4] + a[10] * b[8] + a[11] * b[12];
-			result[9] = a[8] * b[1] + a[9] * b[5] + a[10] * b[9] + a[11] * b[13];
-			result[10] = a[8] * b[2] + a[9] * b[6] + a[10] * b[10] + a[11] * b[14];
-			result[11] = a[8] * b[3] + a[9] * b[7] + a[10] * b[11] + a[11] * b[15];
-
-			result[12] = a[12] * b[0] + a[13] * b[4] + a[14] * b[8] + a[15] * b[12];
-			result[13] = a[12] * b[1] + a[13] * b[5] + a[14] * b[9] + a[15] * b[13];
-			result[14] = a[12] * b[2] + a[13] * b[6] + a[14] * b[10] + a[15] * b[14];
-			result[15] = a[12] * b[3] + a[13] * b[7] + a[14] * b[11] + a[15] * b[15];
-		} //*/
-
 		function multiplyMatrixByVector(m, v, result) {
 			// TODO test row/column cardinality
 			result[0] = m[0] * v[0] + m[1] * v[1] + m[2] * v[2] + m[3];
 			result[1] = m[4] * v[0] + m[5] * v[1] + m[6] * v[2] + m[7];
 			result[2] = m[8] * v[0] + m[9] * v[1] + m[10] * v[2] + m[11];
+		}
+
+		function copyVector(src, dst) {
+			dst[0] = src[0];
+			dst[1] = src[1];
+			dst[2] = src[2];
+			dst[3] = src[3];
 		}
 
 		function scaleVector(v, s, result) {
@@ -807,6 +786,20 @@ var pi = {
 			result[2] = a[2] + b[2];
 		}
 
+		// TODO do we need fixed precision funcs?
+
+		function fixVector(a, radix) {
+			scaleVector(a, radix, a);
+			a[0] = Math.round(a[0]);
+			a[1] = Math.round(a[1]);
+			a[2] = Math.round(a[2]);
+			a[3] = Math.round(a[3]);
+		}
+
+		function unfixVector(a, radix) {
+			scaleVector(a, 1 / radix, a);
+		}
+
 		function vectorMagnitude(v) {
 			return Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
 		}
@@ -815,7 +808,7 @@ var pi = {
 
 		function motionInit(e) {
 			var interval = e.interval || 0;
-			deltaSeconds = interval * 1000;
+			deltaSeconds = interval / 1000;
 
 			lastMotionTime = UTILS.Timer.now() - interval;
 
@@ -853,7 +846,7 @@ var pi = {
 
 		function motionHandler(e, first) {
 			motionTime = UTILS.Timer.now();
-			deltaSeconds = (motionTime - lastMotionTime) * 1000;
+			deltaSeconds = (e.interval || 0) / 1000;
 
 			lastReportedAcceleration[0] = e.acceleration.x;
 			lastReportedAcceleration[1] = e.acceleration.y;
@@ -881,20 +874,27 @@ var pi = {
 			handle3DMotion(accelerationIncludingGravity, accelerationIncludingGravityCodes, result.accelerationDeadZone, result.accelerationThreshold, first);
 			handle3DMotion(rotationRate, rotationRateCodes, result.rotationDeadZone, result.rotationThreshold, first);
 
-			// free-orientation position based on calibrated motion/orientation
+			// free-orientation derived velocity based on calibrated motion/orientation
 
 			multiplyMatrixByVector(result.positionMatrix, acceleration, transformedAcceleration);
-
-			scaleVector(transformedAcceleration, deltaSeconds, velocityDelta);
+			
+			scaleVector(/*transformedA*/acceleration, deltaSeconds, velocityDelta/**/);
+			subtractVectors(velocity, oldVelocityDelta, velocity);
 			addVectors(velocity, velocityDelta, velocity);
+			velocity[3] = vectorMagnitude(velocity);
+
+			copyVector(velocityDelta, oldVelocityDelta);
+
+			handle3DMotion(velocity, velocityCodes, result.velocityDeadZone, result.velocityThreshold, first);
+
+			// and now for position
 
 			scaleVector(velocity, deltaSeconds, positionDelta);
 			addVectors(position, positionDelta, position);
-
-			velocity[3] = vectorMagnitude(velocity);
 			position[3] = vectorMagnitude(position);
 
-			handle3DMotion(velocity, velocityCodes, result.velocityDeadZone, result.velocityThreshold, first);
+			copyVector(positionDelta, oldPositionDelta);
+
 			handle3DMotion(position, positionCodes, result.positionDeadZone, result.positionThreshold, first);
 
 			lastMotionTime = motionTime;
