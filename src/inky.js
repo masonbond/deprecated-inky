@@ -1,66 +1,10 @@
 ;var IN = (function() {"use strict";
 
-// helpful constants
-var constants = {
-	DOUBLE_PI: Math.PI * 2,
-	HALF_PI: Math.PI / 2,
-	DEGREES_TO_RADIANS: Math.PI / 180
-};
-
-// default values for new objects
-var defaults = {
-	pollRate: 50,
-	autoPoll: true,
-	dispatcherEnabled: true,
-	controlEnabled: true,
-	
-	allowContextMenu: false,
-	allowMiddleMouseScroll: false,
-	allowSelect: false,
-	allowDrag: false,
-	allowFocusOnHover: true,
-	allowDefaultKeyboardEvents: false,
-	
-	analogDeadZone: .1,
-	analogThreshold: .01,
-	analogNormalized: true,
-	
-	deviceEnabled: true,
-	devicePollRate: 33,
-	deviceDeadZone: 0,
-	deviceThreshold: 0,
-	deviceCapture: false,
-	deviceNormalized: true,
-	deviceComponentNormalized: true,
-	
-	touchAreaEnabled: true,
-	touchDeadZone: .1,
-	touchThreshold: .01,
-	touchSnap: true,
-	touchFloatOrigin: true,
-	touchAllowScrolling: false,
-	touchNormalized: true,
-
-	orientationXYThreshold: 0.01,
-	orientationXYDeadZone: 0.1,
-	orientationXYNormalized: false,
-	orientationZThreshold: 0.02,
-	orientationZDeadZone: 0.5,
-	orientationZNormalized: false,
-
-	accelerationThreshold: 0.01,
-	accelerationDeadZone: 0.0,
-
-	rotationThreshold: 0.25,
-	rotationDeadZone: 1.0,
-
-	velocityThreshold: 0.001,
-	velocityDeadZone: 0.05,
-
-	positionThreshold: 0.001,
-	positionDeadZone: 0.0
-};
-
+// TODO FIRST fix creeping velocity bug
+// TODO 		looks like base velocity is creeping out of deadZone, accurization needs more work?
+// TODO 		probably should make sure all devicemotion sub deadzone values are being set to 0 regardless
+// TODO NEXT accurize position
+// TODO THIRDST test input filters
 // TODO MOTION_ORIENTATION_MAGNITUDE
 // TODO deadZone wrapping for ORIENTATION_Z?
 // TODO 'normalize' acceleration, acceleration w/ gravity and rotation rate by subtracting components of deadZone-magnitude scaled version of itself
@@ -74,6 +18,13 @@ var defaults = {
 // TODO multitouch audit/necessary fixes
 // TODO onError callback for pointer lock requests
 // TODO way to select radial when rebinding, maybe group like components and give resolveConflict callback to bind?
+
+// helpful constants
+var constants = {
+	DOUBLE_PI: Math.PI * 2,
+	HALF_PI: Math.PI / 2,
+	DEGREES_TO_RADIANS: Math.PI / 180
+};
 
 // static privates
 
@@ -291,6 +242,12 @@ var dispatchers = [];
 var pi = {
 	version: "0.8",
 	async: {},
+	support: {
+		devicemotion: 'devicemotion' in window,
+		touch: 'touchstart' in window,
+		gamepad: 'getGamepads' in navigator || 'webkitGetGamepads' in navigator
+	},
+	motionInterval: undefined,
 	press: function(component, time) {
 		for (var i = 0, dispatcher; dispatcher = dispatchers[i]; ++i) dispatcher.press(component, time);
 	},
@@ -693,9 +650,10 @@ var pi = {
 		// motion
 		//
 
-		var lastMotionTime;
-		var motionTime;
+		var motionInterval;
 		var deltaSeconds;
+
+		var tempVector = [0, 0, 0, 0];
 
 		var acceleration = [0, 0, 0, 0];
 		var accelerationIncludingGravity = [0, 0, 0, 0];
@@ -807,8 +765,8 @@ var pi = {
 		// TODO can actually factor this cleanly
 
 		function motionInit(e) {
-			var interval = e.interval || 0;
-			deltaSeconds = interval / 1000;
+			motionInterval = (IN.motionInterval = e.interval) || 0;
+			IN.motionInterval = deltaSeconds = interval / 1000;
 
 			lastMotionTime = UTILS.Timer.now() - interval;
 
@@ -845,8 +803,8 @@ var pi = {
 		}
 
 		function motionHandler(e, first) {
-			motionTime = UTILS.Timer.now();
-			deltaSeconds = (e.interval || 0) / 1000;
+			motionInterval = e.interval || 0;
+			deltaSeconds = interval / 1000;
 
 			lastReportedAcceleration[0] = e.acceleration.x;
 			lastReportedAcceleration[1] = e.acceleration.y;
@@ -856,9 +814,17 @@ var pi = {
 			lastReportedAccelerationIncludingGravity[1] = e.accelerationIncludingGravity.y;
 			lastReportedAccelerationIncludingGravity[2] = e.accelerationIncludingGravity.z;
 
+
+			if (typeof result.accelerationFilter === 'function') {
+				result.accelerationFilter(lastReportedAcceleration);
+				result.accelerationFilter(lastReportedAccelerationIncludingGravity);
+			}
+
 			lastReportedRotationRate[0] = e.rotationRate.alpha;
 			lastReportedRotationRate[1] = e.rotationRate.beta;
 			lastReportedRotationRate[2] = e.rotationRate.gamma;
+
+			if (typeof result.rotationFilter === 'function') result.rotationFilter(lastReportedRotationRate);
 
 			// adjust for calibration
 
@@ -877,27 +843,32 @@ var pi = {
 			// free-orientation derived velocity based on calibrated motion/orientation
 
 			multiplyMatrixByVector(result.positionMatrix, acceleration, transformedAcceleration);
-			
-			scaleVector(/*transformedA*/acceleration, deltaSeconds, velocityDelta/**/);
-			subtractVectors(velocity, oldVelocityDelta, velocity);
-			addVectors(velocity, velocityDelta, velocity);
-			velocity[3] = vectorMagnitude(velocity);
 
-			copyVector(velocityDelta, oldVelocityDelta);
+			if (acceleration[3] > result.accelerationDeadZone) {
+				scaleVector(/*transformedA*/acceleration, deltaSeconds, velocityDelta/**/);
+				subtractVectors(velocity, oldVelocityDelta, velocity);
+				addVectors(velocity, velocityDelta, velocity);
+				velocity[3] = vectorMagnitude(velocity);
 
-			handle3DMotion(velocity, velocityCodes, result.velocityDeadZone, result.velocityThreshold, first);
+				copyVector(velocityDelta, oldVelocityDelta);
+				handle3DMotion(velocity, velocityCodes, result.velocityDeadZone, result.velocityThreshold, first);
+			}
 
 			// and now for position
 
-			scaleVector(velocity, deltaSeconds, positionDelta);
-			addVectors(position, positionDelta, position);
-			position[3] = vectorMagnitude(position);
+			var crap = '';
 
-			copyVector(positionDelta, oldPositionDelta);
+			if (velocity[3] > result.velocityDeadZone) {
+				scaleVector(velocity, deltaSeconds, positionDelta);
+				addVectors(position, positionDelta, position);
+				position[3] = vectorMagnitude(position);
 
-			handle3DMotion(position, positionCodes, result.positionDeadZone, result.positionThreshold, first);
+				handle3DMotion(position, positionCodes, result.positionDeadZone, result.positionThreshold, first);
 
-			lastMotionTime = motionTime;
+				crap = JSON.stringify(velocity, null, 4);
+			}
+
+			// document.querySelector("#test2").innerHTML = crap;
 		}
 
 		function handle3DMotion(values, codes, deadZone, threshold, first) {
@@ -1120,9 +1091,11 @@ var pi = {
 			
 			accelerationDeadZone: args && args.accelerationDeadZone !== undefined ? args.accelerationDeadZone : defaults.accelerationDeadZone,
 			accelerationThreshold: args && args.accelerationThreshold !== undefined ? args.accelerationThreshold : defaults.accelerationThreshold,
+			accelerationFilter: args && args.accelerationFilter !== undefined ? args.accelerationFilter : defaults.accelerationFilter,
 
 			rotationDeadZone: args && args.rotationDeadZone !== undefined ? args.rotationDeadZone : defaults.rotationDeadZone,
 			rotationThreshold: args && args.rotationThreshold !== undefined ? args.rotationThreshold : defaults.rotationThreshold,
+			rotationFilter: args && args.rotationFilter !== undefined ? args.rotationFilter : defaults.rotationFilter,
 
 			velocityDeadZone: args && args.velocityDeadZone !== undefined ? args.velocityDeadZone : defaults.velocityDeadZone,
 			velocityThreshold: args && args.velocityThreshold !== undefined ? args.velocityThreshold : defaults.velocityThreshold,
@@ -1450,7 +1423,99 @@ var pi = {
 		}
 
 		return result;
+	},
+	Filter: {
+		Ramp: function(alpha) { 
+			var old = [0, 0, 0],
+				t = alpha || (500 / IN.motionInterval),
+				u = 1 - t;
+
+			return function(v) {
+				old[0] = v[0] = v[0] * t + old[0] * u;
+				old[1] = v[1] = v[1] * t + old[1] * u;
+				old[2] = v[2] = v[2] * t + old[2] * u;
+			};
+		},
+		AdaptiveHighPass: function(args) {
+			var old = [0, 0, 0],
+				filter = [0, 0, 0],
+				cutoff = 1 / (args && args.cutoff || 0.9),
+				constant = cutoff / (1 / (args && args.interval || IN.motionInterval) + cutoff),
+				min = args && args.min || 0.01,
+				attenuation = args && args.attenuation || 3,
+				d,
+				alpha;
+
+			return function(v) {
+				d = Math.max(0, Math.min(1, Math.abs(vectorMagnitude(filter) - vectorMagnitude(v)) / min - 1));
+				alpha = d * constant / attenuation + (1 - d) * constant;
+
+				filter[0] = alpha * (filter[0] + v[0] - old[0]);
+				filter[1] = alpha * (filter[1] + v[1] - old[1]);
+				filter[2] = alpha * (filter[2] + v[2] - old[2]);
+
+				old[0] = v[0];
+				old[1] = v[1];
+				old[2] = v[2];
+			};
+		}
 	}
+};
+
+// default values for new objects
+var defaults = {
+	pollRate: 50,
+	autoPoll: true,
+	dispatcherEnabled: true,
+	controlEnabled: true,
+	
+	allowContextMenu: false,
+	allowMiddleMouseScroll: false,
+	allowSelect: false,
+	allowDrag: false,
+	allowFocusOnHover: true,
+	allowDefaultKeyboardEvents: false,
+	
+	analogDeadZone: .1,
+	analogThreshold: .01,
+	analogNormalized: true,
+	
+	deviceEnabled: true,
+	devicePollRate: 33,
+	deviceDeadZone: 0,
+	deviceThreshold: 0,
+	deviceCapture: false,
+	deviceNormalized: true,
+	deviceComponentNormalized: true,
+	
+	touchAreaEnabled: true,
+	touchDeadZone: .1,
+	touchThreshold: .01,
+	touchSnap: true,
+	touchFloatOrigin: true,
+	touchAllowScrolling: false,
+	touchNormalized: true,
+
+	orientationXYThreshold: 0.01,
+	orientationXYDeadZone: 0.1,
+	orientationXYNormalized: false,
+	orientationZThreshold: 0.02,
+	orientationZDeadZone: 0.5,
+	orientationZNormalized: false,
+
+	accelerationThreshold: 0.01,
+	accelerationDeadZone: 0.0,
+	accelerationFilter: false,
+
+	rotationThreshold: 0.25,
+	rotationDeadZone: 1.0,
+	rotationFilter: false,
+
+	velocityThreshold: 0.001,
+	velocityDeadZone: 0.0,
+
+	positionThreshold: 0.001,
+	positionDeadZone: 0.0
 };
 
 // input devices and components
