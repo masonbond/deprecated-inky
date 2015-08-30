@@ -766,9 +766,7 @@ var pi = {
 
 		function motionInit(e) {
 			motionInterval = (IN.motionInterval = e.interval) || 0;
-			IN.motionInterval = deltaSeconds = interval / 1000;
-
-			lastMotionTime = UTILS.Timer.now() - interval;
+			deltaSeconds = motionInterval / 1000;
 
 			pi.async[pi.MOTION_ACCELERATION_X] = (lastReportedAcceleration[0] = e.acceleration.x) - calibration.acceleration[0];
 			pi.async[pi.MOTION_ACCELERATION_Y] = (lastReportedAcceleration[1] = e.acceleration.y) - calibration.acceleration[1];
@@ -804,7 +802,7 @@ var pi = {
 
 		function motionHandler(e, first) {
 			motionInterval = e.interval || 0;
-			deltaSeconds = interval / 1000;
+			deltaSeconds = motionInterval / 1000;
 
 			lastReportedAcceleration[0] = e.acceleration.x;
 			lastReportedAcceleration[1] = e.acceleration.y;
