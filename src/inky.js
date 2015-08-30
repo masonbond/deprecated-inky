@@ -768,6 +768,8 @@ var pi = {
 			motionInterval = (IN.motionInterval = e.interval) || 0;
 			deltaSeconds = motionInterval / 1000;
 
+			if (!defaults.accelerationFilter) defaults.accelerationFilter = new pi.Filter.AdaptiveHighPass();
+
 			pi.async[pi.MOTION_ACCELERATION_X] = (lastReportedAcceleration[0] = e.acceleration.x) - calibration.acceleration[0];
 			pi.async[pi.MOTION_ACCELERATION_Y] = (lastReportedAcceleration[1] = e.acceleration.y) - calibration.acceleration[1];
 			pi.async[pi.MOTION_ACCELERATION_Z] = (lastReportedAcceleration[2] = e.acceleration.z) - calibration.acceleration[2];
@@ -814,8 +816,13 @@ var pi = {
 
 
 			if (typeof result.accelerationFilter === 'function') {
+				try{
 				result.accelerationFilter(lastReportedAcceleration);
 				result.accelerationFilter(lastReportedAccelerationIncludingGravity);
+				} catch (e) {
+					alert(e.stack);
+					result.accelerationFilter = undefined;
+				}
 			}
 
 			lastReportedRotationRate[0] = e.rotationRate.alpha;
@@ -1425,7 +1432,7 @@ var pi = {
 	Filter: {
 		Ramp: function(alpha) { 
 			var old = [0, 0, 0],
-				t = alpha || (500 / IN.motionInterval),
+				t = alpha || (500 / pi.motionInterval),
 				u = 1 - t;
 
 			return function(v) {
@@ -1438,7 +1445,7 @@ var pi = {
 			var old = [0, 0, 0],
 				filter = [0, 0, 0],
 				cutoff = 1 / (args && args.cutoff || 0.9),
-				constant = cutoff / (1 / (args && args.interval || IN.motionInterval) + cutoff),
+				constant = cutoff / (1 / (args && args.interval || pi.motionInterval) + cutoff),
 				min = args && args.min || 0.01,
 				attenuation = args && args.attenuation || 3,
 				d,
@@ -1509,11 +1516,11 @@ var defaults = {
 	rotationDeadZone: 1.0,
 	rotationFilter: false,
 
-	velocityThreshold: 0.001,
-	velocityDeadZone: 0.0,
+	velocityThreshold: 0.01,
+	velocityDeadZone: 0.01,
 
-	positionThreshold: 0.001,
-	positionDeadZone: 0.0
+	positionThreshold: 0.01,
+	positionDeadZone: 0.01
 };
 
 // input devices and components
