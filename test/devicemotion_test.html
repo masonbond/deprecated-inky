@@ -22,6 +22,7 @@ body {
 </head>
 <body>
 
+<div id="test0" class="test"></div>
 <div id="test1" class="test"></div>
 <div id="test2" class="test"></div>
 <div id="test3" class="test"></div>
@@ -34,6 +35,7 @@ var test1 = document.getElementById('test1'),
 
 var testElements = {
 	'Acceleration': test1,
+	'Gravity': test1,
 	'Velocity': test2,
 	'Position': test3
 };
@@ -69,7 +71,7 @@ var motionControl = new IN.Control({
 
 var acccelerationBinding = motionDispatcher.bind({
 	control: motionControl,
-	component: [IN.MOTION_ACCELERATION_X, IN.MOTION_ACCELERATION_Y, IN.MOTION_ACCELERATION_Z, IN.MOTION_ACCELERATION_MAGNITUDE],
+	component: [IN.MOTION_ACCELERATION_WITH_GRAVITY_X, IN.MOTION_ACCELERATION_WITH_GRAVITY_Y, IN.MOTION_ACCELERATION_WITH_GRAVITY_Z, IN.MOTION_ACCELERATION_WITH_GRAVITY_MAGNITUDE],
 	target: { x: 0, y: 0, z: 0, m: 0 }
 });
 
