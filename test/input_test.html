@@ -135,7 +135,7 @@ var rotationControl = new IN.Control({
 
 var rotationBinding = new input2.bind({
 	control: rotationControl,
-	component: [IN.MOTION_VELOCITY_X, IN.MOTION_VELOCITY_Y, IN.MOTION_VELOCITY_Z],//[IN.MOTION_POSITION_X, IN.MOTION_POSITION_Y],
+	component: [IN.MOTION_VELOCITY_X, IN.MOTION_VELOCITY_Y, IN.MOTION_VELOCITY_Z, IN.MOTION_VELOCITY_MAGNITUDE],//[IN.MOTION_POSITION_X, IN.MOTION_POSITION_Y],
 	target: { x: 0, y: 0, z: 0, m: 0, n: 0, smooth: []}
 });
 

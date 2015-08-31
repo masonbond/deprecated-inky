@@ -1,0 +1,90 @@
+<html>
+<head>
+<style>
+body {
+	background: #333;
+	color: #ddd;
+	font-family: monospace;
+	font-size: 32pt;
+}
+
+.test {
+	background: #222;
+	color: #ddd;
+	white-space: pre-line;
+	position: relative;
+	width: 100%;
+	min-height: 10em;
+}
+</style>
+<script src="../src/utils.js"></script>
+<script src="../src/inky.js"></script>
+</head>
+<body>
+
+<div id="test1" class="test"></div>
+<div id="test2" class="test"></div>
+<div id="test3" class="test"></div>
+
+<script>
+
+var test1 = document.getElementById('test1'),
+	test2 = document.getElementById('test2'),
+	test3 = document.getElementById('test3');
+
+var testElements = {
+	'Acceleration': test1,
+	'Velocity': test2,
+	'Position': test3
+};
+
+function moveDump(e) {
+	var componentSplit = e.component.split(' '),
+		axis = componentSplit.pop(),
+		type = componentSplit.pop();
+
+	switch (axis) {
+		case 'X':
+			e.target.x = e.move.v;
+			break;
+		case 'Y':
+			e.target.y = e.move.v;
+			break;
+		case 'Z':
+			e.target.z = e.move.v;
+			break;
+		case 'Magnitude':
+			e.target.m = e.move.v;
+			break;	
+	}
+
+	testElements[type].innerHTML = type + ": " + JSON.stringify(e.target, null, 4);
+}
+
+var motionDispatcher = new IN.Dispatcher();
+
+var motionControl = new IN.Control({
+	move: moveDump
+});
+
+var acccelerationBinding = motionDispatcher.bind({
+	control: motionControl,
+	component: [IN.MOTION_ACCELERATION_X, IN.MOTION_ACCELERATION_Y, IN.MOTION_ACCELERATION_Z, IN.MOTION_ACCELERATION_MAGNITUDE],
+	target: { x: 0, y: 0, z: 0, m: 0 }
+});
+
+var velocityBinding = motionDispatcher.bind({
+	control: motionControl,
+	component: [IN.MOTION_VELOCITY_X, IN.MOTION_VELOCITY_Y, IN.MOTION_VELOCITY_Z, IN.MOTION_VELOCITY_MAGNITUDE],
+	target: { x: 0, y: 0, z: 0, m: 0 }
+});
+
+var positionBinding = motionDispatcher.bind({
+	control: motionControl,
+	component: [IN.MOTION_POSITION_X, IN.MOTION_POSITION_Y, IN.MOTION_POSITION_Z, IN.MOTION_POSITION_MAGNITUDE],
+	target: { x: 0, y: 0, z: 0, m: 0 }
+});
+
+</script>
+</body>
+</html>

@@ -5,6 +5,8 @@
 // TODO 		probably should make sure all devicemotion sub deadzone values are being set to 0 regardless
 // TODO NEXT accurize position
 // TODO THIRDST test input filters
+// TODO component "groups" such as X, Y, Z for vectored types and V for buttons?
+// TODO 		maybe create premade move arguments that filter based on name?
 // TODO MOTION_ORIENTATION_MAGNITUDE
 // TODO deadZone wrapping for ORIENTATION_Z?
 // TODO 'normalize' acceleration, acceleration w/ gravity and rotation rate by subtracting components of deadZone-magnitude scaled version of itself
@@ -768,7 +770,7 @@ var pi = {
 			motionInterval = (IN.motionInterval = e.interval) || 0;
 			deltaSeconds = motionInterval / 1000;
 
-			if (!defaults.accelerationFilter) defaults.accelerationFilter = new pi.Filter.AdaptiveHighPass();
+			if (!defaults.accelerationFilter) defaults.accelerationFilter = new pi.Filter.Ramp();
 
 			pi.async[pi.MOTION_ACCELERATION_X] = (lastReportedAcceleration[0] = e.acceleration.x) - calibration.acceleration[0];
 			pi.async[pi.MOTION_ACCELERATION_Y] = (lastReportedAcceleration[1] = e.acceleration.y) - calibration.acceleration[1];
@@ -802,7 +804,12 @@ var pi = {
 			motionHandler(e, true);
 		}
 
+		var tempVelocityFilter = false;
+		var tempPositionDeltaFilter = false;
+
 		function motionHandler(e, first) {
+			var dicklick = false;
+
 			motionInterval = e.interval || 0;
 			deltaSeconds = motionInterval / 1000;
 
@@ -814,15 +821,9 @@ var pi = {
 			lastReportedAccelerationIncludingGravity[1] = e.accelerationIncludingGravity.y;
 			lastReportedAccelerationIncludingGravity[2] = e.accelerationIncludingGravity.z;
 
-
 			if (typeof result.accelerationFilter === 'function') {
-				try{
 				result.accelerationFilter(lastReportedAcceleration);
 				result.accelerationFilter(lastReportedAccelerationIncludingGravity);
-				} catch (e) {
-					alert(e.stack);
-					result.accelerationFilter = undefined;
-				}
 			}
 
 			lastReportedRotationRate[0] = e.rotationRate.alpha;
@@ -841,6 +842,10 @@ var pi = {
 			accelerationIncludingGravity[3] = vectorMagnitude(lastReportedAccelerationIncludingGravity);
 			rotationRate[3] = vectorMagnitude(lastReportedRotationRate);
 
+			// TODO parameterize damping?
+
+			scaleVector(acceleration, .9, acceleration);
+
 			handle3DMotion(acceleration, accelerationCodes, result.accelerationDeadZone, result.accelerationThreshold, first);
 			handle3DMotion(accelerationIncludingGravity, accelerationIncludingGravityCodes, result.accelerationDeadZone, result.accelerationThreshold, first);
 			handle3DMotion(rotationRate, rotationRateCodes, result.rotationDeadZone, result.rotationThreshold, first);
@@ -851,27 +856,45 @@ var pi = {
 
 			if (acceleration[3] > result.accelerationDeadZone) {
 				scaleVector(/*transformedA*/acceleration, deltaSeconds, velocityDelta/**/);
-				subtractVectors(velocity, oldVelocityDelta, velocity);
 				addVectors(velocity, velocityDelta, velocity);
+
+				tempVelocityFilter = tempVelocityFilter || new pi.Filter.Ramp();
+				tempVelocityFilter(velocity);
+				
 				velocity[3] = vectorMagnitude(velocity);
 
-				copyVector(velocityDelta, oldVelocityDelta);
-				handle3DMotion(velocity, velocityCodes, result.velocityDeadZone, result.velocityThreshold, first);
+				scaleVector(velocity, .9, velocity);
+			} else {
+				dicklick = true;
+				scaleVector(velocity, .5, velocity);
 			}
 
-			// and now for position
-
-			var crap = '';
+			handle3DMotion(velocity, velocityCodes, result.velocityDeadZone, result.velocityThreshold, first);
 
 			if (velocity[3] > result.velocityDeadZone) {
+				var maxVel = Math.max(velocity[0], Math.max(velocity[1], velocity[2]));
+				var temp = [];
+
+				scaleVector(velocity, 1 / maxVel, temp);
+				temp[3] = 1;
+
 				scaleVector(velocity, deltaSeconds, positionDelta);
+
+				positionDelta[0] *= temp[0];
+				positionDelta[1] *= temp[1];
+				positionDelta[2] *= temp[2];
+
+				tempPositionDeltaFilter = tempPositionDeltaFilter || new pi.Filter.Ramp(.05);
+				tempPositionDeltaFilter(positionDelta);
+
 				addVectors(position, positionDelta, position);
+
 				position[3] = vectorMagnitude(position);
 
 				handle3DMotion(position, positionCodes, result.positionDeadZone, result.positionThreshold, first);
-
-				crap = JSON.stringify(velocity, null, 4);
 			}
+
+				
 
 			// document.querySelector("#test2").innerHTML = crap;
 		}
@@ -886,10 +909,7 @@ var pi = {
 			if (magnitude >= deadZone) {
 
 				for (i = 0; i < 4; ++i) {
-					if (first || oldMagnitude < deadZone) {
-						pi.press(codes[i]);
-					}
-
+					if (first || oldMagnitude < deadZone) pi.press(codes[i]);
 					pi.move(codes[i], { v: values[i], dv: values[i] - pi.async[codes[i]] });
 					pi.async[codes[i]] = values[i];
 				}
@@ -1432,21 +1452,21 @@ var pi = {
 	Filter: {
 		Ramp: function(alpha) { 
 			var old = [0, 0, 0],
-				t = alpha || (500 / pi.motionInterval),
+				t = alpha || (pi.motionInterval / 1000),
 				u = 1 - t;
 
 			return function(v) {
-				old[0] = v[0] = v[0] * t + old[0] * u;
-				old[1] = v[1] = v[1] * t + old[1] * u;
-				old[2] = v[2] = v[2] * t + old[2] * u;
+				old[0] = (v[0] = v[0] * t + old[0] * u);
+				old[1] = (v[1] = v[1] * t + old[1] * u);
+				old[2] = (v[2] = v[2] * t + old[2] * u);
 			};
 		},
 		AdaptiveHighPass: function(args) {
 			var old = [0, 0, 0],
-				filter = [0, 0, 0],
+				result = [0, 0, 0],
 				cutoff = 1 / (args && args.cutoff || 0.9),
 				constant = cutoff / (1 / (args && args.interval || pi.motionInterval) + cutoff),
-				min = args && args.min || 0.01,
+				min = args && args.min || 0.033,
 				attenuation = args && args.attenuation || 3,
 				d,
 				alpha;
@@ -1455,13 +1475,17 @@ var pi = {
 				d = Math.max(0, Math.min(1, Math.abs(vectorMagnitude(filter) - vectorMagnitude(v)) / min - 1));
 				alpha = d * constant / attenuation + (1 - d) * constant;
 
-				filter[0] = alpha * (filter[0] + v[0] - old[0]);
-				filter[1] = alpha * (filter[1] + v[1] - old[1]);
-				filter[2] = alpha * (filter[2] + v[2] - old[2]);
+				result[0] = alpha * (result[0] + v[0] - old[0]);
+				result[1] = alpha * (result[1] + v[1] - old[1]);
+				result[2] = alpha * (result[2] + v[2] - old[2]);
 
 				old[0] = v[0];
 				old[1] = v[1];
 				old[2] = v[2];
+
+				v[0] = result[0];
+				v[1] = result[1];
+				v[2] = result[2];
 			};
 		}
 	}
@@ -1509,15 +1533,15 @@ var defaults = {
 	orientationZNormalized: false,
 
 	accelerationThreshold: 0.01,
-	accelerationDeadZone: 0.0,
+	accelerationDeadZone: 0.1,
 	accelerationFilter: false,
 
 	rotationThreshold: 0.25,
 	rotationDeadZone: 1.0,
 	rotationFilter: false,
 
-	velocityThreshold: 0.01,
-	velocityDeadZone: 0.01,
+	velocityThreshold: 0.001,
+	velocityDeadZone: 0.0025,
 
 	positionThreshold: 0.01,
 	positionDeadZone: 0.01
