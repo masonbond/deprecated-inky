@@ -858,9 +858,9 @@ var pi = {
 			motionInterval = e.interval || 0;
 			deltaSeconds = motionInterval / 1000;
 			
-			lastReportedAccelerationIncludingGravity[0] = lastReportedAcceleration[0] = e.accelerationIncludingGravity.x;
-			lastReportedAccelerationIncludingGravity[1] = lastReportedAcceleration[1] = e.accelerationIncludingGravity.y;
-			lastReportedAccelerationIncludingGravity[2] = lastReportedAcceleration[2] = e.accelerationIncludingGravity.z;
+			lastReportedAccelerationIncludingGravity[0] = e.accelerationIncludingGravity.x;
+			lastReportedAccelerationIncludingGravity[1] = e.accelerationIncludingGravity.y;
+			lastReportedAccelerationIncludingGravity[2] = e.accelerationIncludingGravity.z;
 
 			// update orientation matrix for acceleration correction
 
@@ -875,7 +875,7 @@ var pi = {
 
 			// subtract gravity from acceleration
 
-			subtractVectors(lastReportedAcceleration, gravityVector, lastReportedAcceleration);
+			subtractVectors(lastReportedAccelerationIncludingGravity, gravityVector, lastReportedAcceleration);
 
 			try {
 				if (result.accelerationFilter instanceof Array) {
@@ -905,6 +905,7 @@ var pi = {
 			// TODO refine calibration>
 
 			subtractVectors(lastReportedAcceleration, calibration.acceleration, acceleration);
+			lastReportedAcceleration[0] = lastReportedAccelerationIncludingGravity[0] - gravityVector[0];
 			subtractVectors(lastReportedAccelerationIncludingGravity, calibration.accelerationIncludingGravity, accelerationIncludingGravity);
 			subtractVectors(lastReportedRotationRate, calibration.rotationRate, rotationRate);
 
@@ -1472,7 +1473,7 @@ var pi = {
 	Filter: {
 		Ramp: function(alpha) { 
 			var old = [0, 0, 0],
-				t = alpha || (pi.motionInterval / 1000),
+				t = alpha || (pi.motionInterval / 500),
 				u = 1 - t;
 
 			return function(v) {
@@ -1634,8 +1635,8 @@ var defaults = {
 function initMotionDefaults(e) {
 	pi.motionInterval = e.interval;
 
-	//defaults.accelerationFilter = [new pi.Filter.MovingAverage()];
-	defaults.accelerationIncludingGravityFilter = [new pi.Filter.AdaptiveHighPass()];
+	defaults.accelerationFilter = [new pi.Filter.AdaptiveHighPass()];
+	//defaults.accelerationIncludingGravityFilter = [new pi.Filter.AdaptiveHighPass()];
 	//defaults.rotationFilter = new pi.Filter.MovingAverage();
 	//defaults.velocityFilter = [new pi.Filter.MovingAverage(), new pi.Filter.MovingAverage()];
 	//defaults.positionFilter = new pi.Filter.MovingAverage();
