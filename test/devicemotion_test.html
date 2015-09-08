@@ -1,11 +1,16 @@
 <html>
 <head>
 <style>
+* {
+	margin: 0;
+	padding: 0;
+}
+
 body {
 	background: #333;
 	color: #ddd;
 	font-family: monospace;
-	font-size: 32pt;
+	font-size: 32pt !important;
 }
 
 .test {
@@ -14,14 +19,13 @@ body {
 	white-space: pre-line;
 	position: relative;
 	width: 100%;
-	min-height: 10em;
+	min-height: 8em;
 }
 </style>
 <script src="../src/utils.js"></script>
 <script src="../src/inky.js"></script>
 </head>
 <body>
-
 <div id="test0" class="test"></div>
 <div id="test1" class="test"></div>
 <div id="test2" class="test"></div>
@@ -29,15 +33,16 @@ body {
 
 <script>
 
-var test1 = document.getElementById('test1'),
+var test0 = document.getElementById('test0'),
+	test1 = document.getElementById('test1'),
 	test2 = document.getElementById('test2'),
 	test3 = document.getElementById('test3');
 
 var testElements = {
+	'Gravity': test0,
 	'Acceleration': test1,
-	'Gravity': test1,
-	'Velocity': test2,
-	'Position': test3
+	'Orientation': test2,
+	'Velocity': test3
 };
 
 function moveDump(e) {
@@ -69,23 +74,23 @@ var motionControl = new IN.Control({
 	move: moveDump
 });
 
-var acccelerationBinding = motionDispatcher.bind({
+var gravityBinding = motionDispatcher.bind({
 	control: motionControl,
 	component: [IN.MOTION_ACCELERATION_WITH_GRAVITY_X, IN.MOTION_ACCELERATION_WITH_GRAVITY_Y, IN.MOTION_ACCELERATION_WITH_GRAVITY_Z, IN.MOTION_ACCELERATION_WITH_GRAVITY_MAGNITUDE],
 	target: { x: 0, y: 0, z: 0, m: 0 }
 });
 
-var velocityBinding = motionDispatcher.bind({
+var orientationBinding = motionDispatcher.bind({
 	control: motionControl,
-	component: [IN.MOTION_VELOCITY_X, IN.MOTION_VELOCITY_Y, IN.MOTION_VELOCITY_Z, IN.MOTION_VELOCITY_MAGNITUDE],
+	component: [IN.MOTION_ORIENTATION_X, IN.MOTION_ORIENTATION_Y, IN.MOTION_ORIENTATION_Z, IN.MOTION_ORIENTATION_MAGNITUDE],
 	target: { x: 0, y: 0, z: 0, m: 0 }
 });
 
-var positionBinding = motionDispatcher.bind({
+var accelerationBinding = motionDispatcher.bind({
 	control: motionControl,
-	component: [IN.MOTION_POSITION_X, IN.MOTION_POSITION_Y, IN.MOTION_POSITION_Z, IN.MOTION_POSITION_MAGNITUDE],
+	component: [IN.MOTION_ACCELERATION_X, IN.MOTION_ACCELERATION_Y, IN.MOTION_ACCELERATION_Z, IN.MOTION_ACCELERATION_MAGNITUDE],
 	target: { x: 0, y: 0, z: 0, m: 0 }
-});
+});//*/
 
 </script>
 </body>

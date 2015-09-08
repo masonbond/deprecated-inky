@@ -2,8 +2,10 @@
 
 // TODO FIRST remove gravity from accelerationIncludingGravity yourself, inbuilt blows chunks
 // TODO 		maybe use orientation to determine which way is "down" and deduct normalized 1G vector in that direction from that
-// TODO 		maybe also use per-component deadzone? each component susceptible to mad noise
+// TODO 		maybe also use per-component deadzone? originally thought each component susceptible to seemingly independent noise but now not sure 
 // TODO 		little noise on 1s delay average, slightly less on 2 .5s ones; cyclic noise?
+// TODO NEXT figure out where random 0 0 0 0s are coming from in MovingAverage, is it coming from motionHandler?
+// TODO calibrate gravity by taking magnitude of accelerationIncludingGravity and setting that as z?
 // TODO NEXT accurize position
 // TODO THIRDST test input filters
 // TODO component "groups" such as X, Y, Z for vectored types and V for buttons?
@@ -26,12 +28,135 @@
 var constants = {
 	DOUBLE_PI: Math.PI * 2,
 	HALF_PI: Math.PI / 2,
-	DEGREES_TO_RADIANS: Math.PI / 180
+	DEGREES_TO_RADIANS: Math.PI / 180,
+	GRAVITY_VECTOR: [0, 0, 9.9 /* 9.80655, but my accelerometer sux */, 9.9]
 };
 
 // static privates
 
 // helpers
+
+// math
+
+function identityMatrix() {
+	return [
+		1, 0, 0, 0,
+		0, 1, 0, 0,
+		0, 0, 1, 0,
+		0, 0, 0, 1
+	];
+}
+
+function buildXRotationMatrix(x, result) {
+	var cx = Math.cos(x),
+		sx = Math.sin(x);
+
+	result[0] = 1;
+	result[1] = 0;
+	result[2] = 0;
+
+	result[4] = 0;
+	result[5] = cx;
+	result[6] = sx;
+
+	result[8] = 0;
+	result[9] = -sx;
+	result[10] = cx;
+}
+
+function buildYRotationMatrix(x, result) {
+	var cx = Math.cos(x),
+		sx = Math.sin(x);
+
+	result[0] = cx;
+	result[1] = 0;
+	result[2] = -sx;
+
+	result[4] = 0;
+	result[5] = 1;
+	result[6] = 0;
+
+	result[8] = sx;
+	result[9] = 0;
+	result[10] = cx;
+}
+
+function buildZRotationMatrix(x, result) {
+	var cx = Math.cos(x),
+		sx = Math.sin(x);
+
+	result[0] = cx;
+	result[1] = sx;
+	result[2] = 0;
+
+	result[4] = -sx;
+	result[5] = cx;
+	result[6] = 0;
+
+	result[8] = 0;
+	result[9] = 0;
+	result[10] = 1;
+}
+
+function buildZYXRotationMatrix(x, y, z, result) {
+	var cx = Math.cos(x),
+		sx = Math.sin(x),
+		cy = Math.cos(y),
+		sy = Math.sin(y),
+		cz = Math.cos(z),
+		sz = Math.sin(z);
+
+	result[0] = cy * cz;
+	result[1] = cy * sz;
+	result[2] = -sy;
+
+	result[4] = cz * sx * sy - cx * sz;
+	result[5] = cx * cz + sx * sy * sz;
+	result[6] = cy * sx;
+
+	result[8] = cx * cz * sy + sx * sz;
+	result[9] = -cz * sx + cx * sy * sz;
+	result[10] = cx * cy;
+}
+
+function multiplyMatrixByVector(m, v, result) {
+	// TODO test row/column cardinality
+	result[0] = m[0] * v[0] + m[1] * v[1] + m[2] * v[2];
+	result[1] = m[4] * v[0] + m[5] * v[1] + m[6] * v[2];
+	result[2] = m[8] * v[0] + m[9] * v[1] + m[10] * v[2];
+}
+
+function copyVector(src, dst) {
+	dst[0] = src[0];
+	dst[1] = src[1];
+	dst[2] = src[2];
+	dst[3] = src[3];
+}
+
+function scaleVector(v, s, result) {
+	result[0] = v[0] * s;
+	result[1] = v[1] * s;
+	result[2] = v[2] * s;
+	result[3] = v[3] * s;
+}
+
+function subtractVectors(a, b, result) {
+	result[0] = a[0] - b[0];
+	result[1] = a[1] - b[1];
+	result[2] = a[2] - b[2];
+}
+
+function addVectors(a, b, result) {
+	result[0] = a[0] + b[0];
+	result[1] = a[1] + b[1];
+	result[2] = a[2] + b[2];
+}
+
+function vectorMagnitude(v) {
+	return Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+}
+
+// events
 
 function indexOfListener(obj, component, control) {
 	for (var i = 0, l = obj[component].length; i < l; ++i) {
@@ -459,11 +584,18 @@ var pi = {
 				orientation: [0, 0, 0, 0],
 				acceleration: [0, 0, 0, 0],
 				accelerationIncludingGravity: [0, 0, 0, 0],
-				rotationRate: [0, 0, 0, 0],
-				positionMatrix: identityMatrix()
+				rotationRate: [0, 0, 0, 0]
 			};
+
 		var oldOrientation = [0, 0, 0, 0];
 		var lastReportedOrientation = [0, 0, 0, 0];
+
+		var orientationMatrix = [
+			0, 0, 0, 0,
+			0, 0, 0, 0,
+			0, 0, 0, 0,
+			0, 0, 0, 0
+		];
 
 		window.addEventListener('deviceorientation', orientationInit);
 
@@ -514,10 +646,6 @@ var pi = {
 				vyOld = oldOrientation[1],
 				vzOld = oldOrientation[2],
 				angleDiff;
-
-			// update position matrix!
-
-			buildRotationMatrix(x, y, z, result.positionMatrix);
 
 			// x/y orientation handling
 
@@ -656,6 +784,8 @@ var pi = {
 		var motionInterval;
 		var deltaSeconds;
 
+		var gravityVector = [0, 0, 0];
+
 		var acceleration = [0, 0, 0, 0];
 		var accelerationIncludingGravity = [0, 0, 0, 0];
 
@@ -679,75 +809,6 @@ var pi = {
 		var lastReportedRotationRate = [0, 0, 0, 0];
 
 		window.addEventListener('devicemotion', motionInit);
-
-		function identityMatrix() {
-			return [
-				1, 0, 0, 0,
-				0, 1, 0, 0,
-				0, 0, 1, 0,
-				0, 0, 0, 1
-			];
-		}
-
-		function buildRotationMatrix(x, y, z, result) {
-			var cx = Math.cos(x),
-				sx = Math.sin(x),
-				cy = Math.cos(y),
-				sy = Math.sin(y),
-				cz = Math.cos(z),
-				sz = Math.sin(z),
-				cycz = cy * cz,
-				cysz = cy * sz;
-
-			result[0] = cx * cycz - sx * sz;
-			result[1] = cx * cysz + sx * cz;
-			result[2] = -cx * sy;
-
-			result[4] = -sx * cycz - cx * sz;
-			result[5] = -sx * cysz + cx * cz;
-			result[6] = sx * sy;
-
-			result[8] = sy * cz;
-			result[9] = sy * sz;
-			result[10] = cy;
-		}
-
-		function multiplyMatrixByVector(m, v, result) {
-			// TODO test row/column cardinality
-			result[0] = m[0] * v[0] + m[1] * v[1] + m[2] * v[2] + m[3];
-			result[1] = m[4] * v[0] + m[5] * v[1] + m[6] * v[2] + m[7];
-			result[2] = m[8] * v[0] + m[9] * v[1] + m[10] * v[2] + m[11];
-		}
-
-		function copyVector(src, dst) {
-			dst[0] = src[0];
-			dst[1] = src[1];
-			dst[2] = src[2];
-			dst[3] = src[3];
-		}
-
-		function scaleVector(v, s, result) {
-			result[0] = v[0] * s;
-			result[1] = v[1] * s;
-			result[2] = v[2] * s;
-			result[3] = v[3] * s;
-		}
-
-		function subtractVectors(a, b, result) {
-			result[0] = a[0] - b[0];
-			result[1] = a[1] - b[1];
-			result[2] = a[2] - b[2];
-		}
-
-		function addVectors(a, b, result) {
-			result[0] = a[0] + b[0];
-			result[1] = a[1] + b[1];
-			result[2] = a[2] + b[2];
-		}
-
-		function vectorMagnitude(v) {
-			return Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
-		}
 
 		// TODO can actually factor this cleanly
 
@@ -787,27 +848,51 @@ var pi = {
 			motionHandler(e, true);
 		}
 
+		var xRot = identityMatrix(),
+			yRot = identityMatrix(),
+			zRot = identityMatrix();
+
+		var altRot = [0, 0, 0, 0];
+
 		function motionHandler(e, first) {
 			motionInterval = e.interval || 0;
 			deltaSeconds = motionInterval / 1000;
-
-			lastReportedAcceleration[0] = e.acceleration.x;
-			lastReportedAcceleration[1] = e.acceleration.y;
-			lastReportedAcceleration[2] = e.acceleration.z;
 			
-			lastReportedAccelerationIncludingGravity[0] = e.accelerationIncludingGravity.x;
-			lastReportedAccelerationIncludingGravity[1] = e.accelerationIncludingGravity.y;
-			lastReportedAccelerationIncludingGravity[2] = e.accelerationIncludingGravity.z;
+			lastReportedAccelerationIncludingGravity[0] = lastReportedAcceleration[0] = e.accelerationIncludingGravity.x;
+			lastReportedAccelerationIncludingGravity[1] = lastReportedAcceleration[1] = e.accelerationIncludingGravity.y;
+			lastReportedAccelerationIncludingGravity[2] = lastReportedAcceleration[2] = e.accelerationIncludingGravity.z;
 
-			if (result.accelerationFilter instanceof Array) {
-				for (var i = 0; i < result.accelerationFilter.length; ++i) {
-					if (typeof result.accelerationFilter[i] === 'function') result.accelerationFilter[i](lastReportedAcceleration);
+			// update orientation matrix for acceleration correction
+
+			buildZYXRotationMatrix(
+				lastReportedOrientation[0],
+				lastReportedOrientation[1],
+				lastReportedOrientation[2],
+				orientationMatrix
+			);
+
+			multiplyMatrixByVector(orientationMatrix, constants.GRAVITY_VECTOR, gravityVector);
+
+			// subtract gravity from acceleration
+
+			subtractVectors(lastReportedAcceleration, gravityVector, lastReportedAcceleration);
+
+			try {
+				if (result.accelerationFilter instanceof Array) {
+					for (var i = 0; i < result.accelerationFilter.length; ++i) {
+						if (typeof result.accelerationFilter[i] === 'function') result.accelerationFilter[i](lastReportedAcceleration);
+					}
 				}
-			}
 
-			if (result.accelerationIncludingGravityFilter instanceof Array) {
-				for (var i = 0; i < result.accelerationIncludingGravityFilter.length; ++i) {
-					if (typeof result.accelerationIncludingGravityFilter[i] === 'function') result.accelerationIncludingGravityFilter[i](lastReportedAccelerationIncludingGravity);
+				if (result.accelerationIncludingGravityFilter instanceof Array) {
+					for (var i = 0; i < result.accelerationIncludingGravityFilter.length; ++i) {
+						if (typeof result.accelerationIncludingGravityFilter[i] === 'function') result.accelerationIncludingGravityFilter[i](lastReportedAccelerationIncludingGravity);
+					}
+				}
+			} catch (e) {
+				if (!window.dicklicks) {
+					window.dicklicks = true;
+					alert(e.toString());
 				}
 			}
 
@@ -817,7 +902,7 @@ var pi = {
 
 			if (typeof result.rotationFilter === 'function') result.rotationFilter(lastReportedRotationRate);
 
-			// adjust for calibration
+			// TODO refine calibration>
 
 			subtractVectors(lastReportedAcceleration, calibration.acceleration, acceleration);
 			subtractVectors(lastReportedAccelerationIncludingGravity, calibration.accelerationIncludingGravity, accelerationIncludingGravity);
@@ -831,36 +916,7 @@ var pi = {
 			handle3DMotion(accelerationIncludingGravity, accelerationIncludingGravityCodes, result.accelerationIncludingGravityDeadZone, result.accelerationIncludingGravityThreshold, first);
 			handle3DMotion(rotationRate, rotationRateCodes, result.rotationDeadZone, result.rotationThreshold, first);
 
-			// free-orientation derived velocity based on calibrated motion/orientation
-
-			multiplyMatrixByVector(result.positionMatrix, acceleration, transformedAcceleration);
-
-			if (acceleration[3] > result.accelerationDeadZone) {
-				scaleVector(/*transformedA*/acceleration, deltaSeconds, velocityDelta);
-				addVectors(velocity, velocityDelta, velocity);
-
-				if (result.velocityFilter instanceof Array) {
-					for (var i = 0; i < result.velocityFilter.length; ++i) {
-						if (typeof result.velocityFilter[i] === 'function') result.velocityFilter[i](lastReportedAcceleration);
-					}
-				}
-			} else {
-				scaleVector(velocity, 0.5, velocity);
-			}
-
-			velocity[3] = vectorMagnitude(velocity);
-			handle3DMotion(velocity, velocityCodes, result.velocityDeadZone, result.velocityThreshold, first);
-
-			if (velocity[3] > result.velocityDeadZone) {
-				scaleVector(velocity, deltaSeconds, positionDelta);
-				addVectors(position, positionDelta, position);
-
-				if (typeof result.positionFilter === 'function') result.positionFilter(positionDelta);
-
-				position[3] = vectorMagnitude(position);
-
-				handle3DMotion(position, positionCodes, result.positionDeadZone, result.positionThreshold, first);
-			}
+			// TODO free-orientation derived velocity based on calibrated motion/orientation
 		}
 
 		function handle3DMotion(values, codes, deadZone, threshold, first) {
@@ -1098,10 +1154,6 @@ var pi = {
 			positionThreshold: args && args.positionThreshold !== undefined ? args.positionThreshold : defaults.positionThreshold,
 			positionFilter: args && args.positionFilter !== undefined ? args.positionFilter : defaults.positionFilter,
 
-			// TODO pros/cons of exposing this here? 
-
-			positionMatrix: identityMatrix(),
-
 			allowContextMenu: args && args.allowContextMenu !== undefined ? args.allowContextMenu : defaults.allowContextMenu,
 			allowMiddleMouseScroll: args && args.allowMiddleMouseScroll !== undefined ? args.allowMiddleMouseScroll : defaults.allowMiddleMouseScroll,
 			allowSelect: args && args.allowSelect !== undefined ? args.allowSelect : defaults.allowSelect,
@@ -1172,9 +1224,7 @@ var pi = {
 				if (z !== false) calibration.acceleration[2] = (z === undefined || z === true) ? lastReportedAcceleration[2] : z;
 			},
 			calibratePosition: function(x, y, z) {
-				if (x !== false) calibration.positionMatrix[4] = (x === undefined || x === true) ? position[0] : x;
-				if (y !== false) calibration.positionMatrix[8] = (y === undefined || y === true) ? position[1] : y;
-				if (z !== false) calibration.positionMatrix[12] = (z === undefined || z === true) ? position[2] : z;
+				// TODO calibratePosition
 			},
 			poll: function() {
 				// see if result.element changed on us
@@ -1446,7 +1496,7 @@ var pi = {
 			return function(v) {
 				if (v[0] === null) return;
 
-				d = Math.max(0, Math.min(1, Math.abs(vectorMagnitude(filter) - vectorMagnitude(v)) / min - 1));
+				d = Math.max(0, Math.min(1, Math.abs(vectorMagnitude(old) - vectorMagnitude(v)) / min - 1));
 				alpha = d * constant / attenuation + (1 - d) * constant;
 
 				result[0] = alpha * (result[0] + v[0] - old[0]);
@@ -1552,17 +1602,17 @@ var defaults = {
 	touchNormalized: true,
 
 	orientationXYThreshold: 0.01,
-	orientationXYDeadZone: 0.1,
+	orientationXYDeadZone: 0.01,
 	orientationXYNormalized: false,
-	orientationZThreshold: 0.02,
-	orientationZDeadZone: 0.5,
+	orientationZThreshold: 0.01,
+	orientationZDeadZone: 0.01,
 	orientationZNormalized: false,
 
-	accelerationThreshold: 0.01,
+	accelerationThreshold: 0.0,
 	accelerationDeadZone: 0.01,
 	accelerationFilter: false,
 
-	accelerationIncludingGravityThreshold: 0.01,
+	accelerationIncludingGravityThreshold: 0.0,
 	accelerationIncludingGravityDeadZone: 0,
 	accelerationIncludingGravityFilter: false,
 
@@ -1570,11 +1620,11 @@ var defaults = {
 	rotationDeadZone: 1.0,
 	rotationFilter: false,
 
-	velocityThreshold: 0.001,
-	velocityDeadZone: 0.01,
+	velocityThreshold: 0.0,
+	velocityDeadZone: 0.0,
 	velocityFilter: false,
 
-	positionThreshold: 0.01,
+	positionThreshold: 0.0,
 	positionDeadZone: 0.0,
 	positionFilter: false
 };
@@ -1584,11 +1634,11 @@ var defaults = {
 function initMotionDefaults(e) {
 	pi.motionInterval = e.interval;
 
-	defaults.accelerationFilter = [new pi.Filter.MovingAverage()];
-	defaults.accelerationIncludingGravityFilter = [new pi.Filter.MovingAverage(21)];
-	defaults.rotationFilter = new pi.Filter.MovingAverage();
-	defaults.velocityFilter = [new pi.Filter.MovingAverage(), new pi.Filter.MovingAverage()];
-	defaults.positionFilter = new pi.Filter.MovingAverage();
+	//defaults.accelerationFilter = [new pi.Filter.MovingAverage()];
+	defaults.accelerationIncludingGravityFilter = [new pi.Filter.AdaptiveHighPass()];
+	//defaults.rotationFilter = new pi.Filter.MovingAverage();
+	//defaults.velocityFilter = [new pi.Filter.MovingAverage(), new pi.Filter.MovingAverage()];
+	//defaults.positionFilter = new pi.Filter.MovingAverage();
 
 	window.removeEventListener('devicemotion', initMotionDefaults);
 }
