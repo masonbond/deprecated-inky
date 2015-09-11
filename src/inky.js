@@ -1,16 +1,12 @@
 ;var IN = (function() {"use strict";
 
-// TODO FIRST FIRST refactor defaults adding so that pi.Filter constructors are available in them
 // TODO don't give up on velocity, position
 // TODO address component code->xyz pain point in controller; maybe create premade move arguments that filter based on name and autopop x, y, z??
 // TODO MOTION_ORIENTATION_MAGNITUDE
-// TODO deadZone wrapping for ORIENTATION_Z?
+// NEW	deadZone wrapping for ORIENTATION_Z?
 // TODO 'normalize' acceleration, acceleration w/ gravity and rotation rate by subtracting components of deadZone-magnitude scaled version of itself
-// TODO radius fallback when pressure is undefined on touch events?
-//		gotta test this one as my phone's native radius->pressure simulation is weak as hell
-// TODO chaining for all objects
+// NEW	radius components, fallback when pressure is undefined on touch events? gotta test this one as my phone's native radius->pressure simulation is weak as hell
 // TODO multitouch support audit/necessary fixes
-// TODO onError callback for pointer lock requests
 // TODO way to select radial when rebinding, maybe group like components and give resolveConflict callback to bind?
 
 // helpful constants
@@ -109,7 +105,6 @@ function buildZYXRotationMatrix(x, y, z, result) {
 }
 
 function multiplyMatrixByVector(m, v, result) {
-	// TODO test row/column cardinality
 	result[0] = m[0] * v[0] + m[1] * v[1] + m[2] * v[2];
 	result[1] = m[4] * v[0] + m[5] * v[1] + m[6] * v[2];
 	result[2] = m[8] * v[0] + m[9] * v[1] + m[10] * v[2];
@@ -331,7 +326,7 @@ function pointerLockChange(e) {
 }
 
 function pointerLockError(e) {
-	console.log("POINTER ERROR", e);
+	if (pi.Mouse.onPointerLockError === 'function') pi.Mouse.onPointerLockError(e);
 }
 
 function trackFocus(e) {
@@ -376,15 +371,19 @@ var pi = {
 	motionInterval: undefined,
 	press: function(component, time) {
 		for (var i = 0, dispatcher; dispatcher = dispatchers[i]; ++i) dispatcher.press(component, time);
+		return pi;
 	},
 	hold: function(component, duration, time) {
 		for (var i = 0, dispatcher; dispatcher = dispatchers[i]; ++i) dispatcher.hold(component, duration, time);
+		return pi;
 	},
 	release: function(component, duration, time) {
 		for (var i = 0, dispatcher; dispatcher = dispatchers[i]; ++i) dispatcher.release(component, duration, time);
+		return pi;
 	},
 	move: function(component, args, time) {
 		for (var i = 0, dispatcher; dispatcher = dispatchers[i]; ++i) dispatcher.move(component, args, time);
+		return pi;
 	},
 	Mouse: {
 		position: {x: undefined, y: undefined},
@@ -392,7 +391,9 @@ var pi = {
 			document.exitPointerLock = document[UTILS.getMember(document, ["exitPointerLock", "webkitExitPointerLock", "mozExitPointerLock"])];
 			onExitPointerLock = onExit;
 			document.exitPointerLock();
+			return pi.Mouse;
 		},
+		onPointerLockError: undefined,
 		pointerLockElement: undefined
 	},
 	Dispatcher: function(args) { 
@@ -846,12 +847,6 @@ var pi = {
 			motionHandler(e, true);
 		}
 
-		var xRot = identityMatrix(),
-			yRot = identityMatrix(),
-			zRot = identityMatrix();
-
-		var altRot = [0, 0, 0, 0];
-
 		function motionHandler(e, first) {
 			motionInterval = e.interval || 0;
 			deltaSeconds = motionInterval / 1000;
@@ -904,8 +899,6 @@ var pi = {
 
 			if (typeof result.rotationFilter === 'function') result.rotationFilter(lastReportedRotationRate);
 
-			// TODO refine calibration>
-
 			subtractVectors(lastReportedAcceleration, calibration.acceleration, acceleration);
 
 			lastReportedAcceleration[0] = lastReportedAccelerationIncludingGravity[0] - gravityVector[0];
@@ -920,7 +913,7 @@ var pi = {
 			handle3DMotion(accelerationIncludingGravity, accelerationIncludingGravityCodes, result.accelerationIncludingGravityDeadZone, result.accelerationIncludingGravityThreshold, first);
 			handle3DMotion(rotationRate, rotationRateCodes, result.rotationDeadZone, result.rotationThreshold, first);
 
-			/* TODO velocity, position
+			/* here lie the dreams of gpsless velocity, position on consumer phones
 
 			scaleVector(lastReportedAcceleration, deltaSeconds, velocityDelta);
 			addVectors(velocity, velocityDelta, velocity);
@@ -929,8 +922,6 @@ var pi = {
 
 			*/
 
-
-			// TODO free-orientation derived velocity based on calibrated motion/orientation
 		}
 
 		function handle3DMotion(values, codes, deadZone, threshold, first) {
@@ -1179,15 +1170,19 @@ var pi = {
 			
 			press: function(component, time) {
 				if (result.enabled) raiseEvents(result, listeners[component], beforePress, component, time);
+				return result;
 			},
 			hold: function(component, duration, time) {
 				if (result.enabled) raiseEvents(result, listeners[component], beforeHold, component, time, duration);
+				return result;
 			},
 			release: function(component, duration, time) {
 				if (result.enabled) raiseEvents(result, listeners[component], beforeRelease, component, time, duration);
+				return result;
 			},
 			move: function(component, args, time) {
 				if (result.enabled) raiseEvents(result, listeners[component], beforeMove, component, time, args);
+				return result;
 			},
 			bind: function(args) {
 				var binding = {
@@ -1203,6 +1198,7 @@ var pi = {
 			},
 			unbind: function(args) {
 				modifyListeners(removeListener, listeners, args.component, {control: args.control}, args.prepend);
+				return result;
 			},
 			rebind: function(args) {
 				if (rebindTarget.control !== undefined || !args.control) return false;
@@ -1214,7 +1210,7 @@ var pi = {
 				this.unbind(args);
 				this.bind({control: rebindControl});
 
-				return true;
+				return this.bind({control: rebindControl});
 			},
 			requestPointerLock: function(onEnter, onExit) {
 				oldTargetElement.requestPointerLock = oldTargetElement.requestPointerLock || oldTargetElement[UTILS.getMember(oldTargetElement, ["webkitRequestPointerLock", "mozRequestPointerLock"])];
@@ -1222,23 +1218,27 @@ var pi = {
 				onExitPointerLockElement = onExit;
 				onExitPointerLock = undefined;
 				oldTargetElement.requestPointerLock();
+				return result;
 			},
 			exitPointerLock: function(onExit) {
 				if (pointerLockElement === oldTargetElement) IN.Mouse.exitPointerLock(onExit);
+				return result;
 			},
 			calibrateOrientation: function(x, y, z) {
 				if (x !== false) calibration.orientation[0] = (x === undefined || x === true) ? lastReportedOrientation[0] : x;
 				if (y !== false) calibration.orientation[1] = (y === undefined || y === true) ? lastReportedOrientation[1] : y;
 				if (z !== false) calibration.orientation[2] = (z === undefined || z === true) ? lastReportedOrientation[2] : z;
+				return result;
 			},
 			calibrateAcceleration: function(x, y, z) {
-				// TODO measure effects on velocity? maybe need to calibrate that separately
 				if (x !== false) calibration.acceleration[0] = (x === undefined || x === true) ? lastReportedAcceleration[0] : x;
 				if (y !== false) calibration.acceleration[1] = (y === undefined || y === true) ? lastReportedAcceleration[1] : y;
 				if (z !== false) calibration.acceleration[2] = (z === undefined || z === true) ? lastReportedAcceleration[2] : z;
+				return result;
 			},
 			calibratePosition: function(x, y, z) {
-				// TODO calibratePosition
+				// rip :'(
+				return result;
 			},
 			poll: function() {
 				// see if result.element changed on us
@@ -1254,6 +1254,7 @@ var pi = {
 				for (var component in pi.async) this.hold(component);
 
 				pollGamepads();
+				return result;
 			}
 		};
 
@@ -1417,6 +1418,7 @@ var pi = {
 			},
 			init: function(e) {
 				e.touchOrigin = {x: 0, y: 0};
+				return result;
 			}
 		});
 
@@ -1619,15 +1621,15 @@ var defaults = {
 	orientationXYDeadZone: 0.01,
 	orientationXYNormalized: false,
 	orientationZThreshold: 0.01,
-	orientationZDeadZone: 0.01,
+	orientationZDeadZone: 1.01,
 	orientationZNormalized: false,
 
-	accelerationThreshold: 0.0,
-	accelerationDeadZone: 0.0,
+	accelerationThreshold: 0.01,
+	accelerationDeadZone: 0.025,
 	accelerationFilter: false,
 
-	accelerationIncludingGravityThreshold: 0.0,
-	accelerationIncludingGravityDeadZone: 0,
+	accelerationIncludingGravityThreshold: 0.01,
+	accelerationIncludingGravityDeadZone: 0.025,
 	accelerationIncludingGravityFilter: false,
 
 	rotationThreshold: 0.25,
@@ -1649,8 +1651,8 @@ function initMotionDefaults(e) {
 	pi.motionInterval = e.interval;
 
 	//defaults.accelerationFilter = [];
-	defaults.accelerationIncludingGravityFilter = [new pi.Filter.Zero()];
-	//defaults.rotationFilter = new pi.Filter.MovingAverage();
+	defaults.accelerationIncludingGravityFilter = [new pi.Filter.MovingAverage()];
+	defaults.rotationFilter = new pi.Filter.MovingAverage();
 	//defaults.velocityFilter = [new pi.Filter.MovingAverage(), new pi.Filter.MovingAverage()];
 	//defaults.positionFilter = new pi.Filter.MovingAverage();
 

@@ -23,6 +23,7 @@ body {
 }
 
 canvas {
+	display: none;
 	margin-top: 2em;
 	width: 900px;
 	height: 1400px;
@@ -34,7 +35,7 @@ canvas {
 <script src="../src/inky.js"></script>
 </head>
 <body>
-<canvas id="canvas0"/>
+<canvas id="canvas0"></canvas>
 <div id="test0" class="test"></div>
 <div id="test1" class="test"></div>
 <div id="test2" class="test"></div>
@@ -81,7 +82,7 @@ function moveDump(e) {
 	switch (axis) {
 		case 'X':
 			e.target.x = e.move.v;
-			if (type === 'Gravity') xValues.push(e.move.v);
+			//if (type === 'Gravity') xValues.push(e.move.v);
 			break;
 		case 'Y':
 			e.target.y = e.move.v;
@@ -131,7 +132,7 @@ var velocityBinding = motionDispatcher.bind({
 });//*/
 
 var first = true;
-
+/*
 setInterval(function() {
 	var l = xValues.length ,
 		w = canvas.width - l,
@@ -159,6 +160,7 @@ setInterval(function() {
 		w += 1;
 	}
 }, 100);
+//*/
 
 </script>
 </body>
