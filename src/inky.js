@@ -1,26 +1,15 @@
 ;var IN = (function() {"use strict";
 
-// TODO FIRST remove gravity from accelerationIncludingGravity yourself, inbuilt blows chunks
-// TODO 		maybe use orientation to determine which way is "down" and deduct normalized 1G vector in that direction from that
-// TODO 		maybe also use per-component deadzone? originally thought each component susceptible to seemingly independent noise but now not sure 
-// TODO 		little noise on 1s delay average, slightly less on 2 .5s ones; cyclic noise?
-// TODO NEXT figure out where random 0 0 0 0s are coming from in MovingAverage, is it coming from motionHandler?
-// TODO calibrate gravity by taking magnitude of accelerationIncludingGravity and setting that as z?
-// TODO NEXT accurize position
-// TODO THIRDST test input filters
-// TODO component "groups" such as X, Y, Z for vectored types and V for buttons?
-// TODO 		maybe create premade move arguments that filter based on name?
+// TODO FIRST FIRST refactor defaults adding so that pi.Filter constructors are available in them
+// TODO don't give up on velocity, position
+// TODO address component code->xyz pain point in controller; maybe create premade move arguments that filter based on name and autopop x, y, z??
 // TODO MOTION_ORIENTATION_MAGNITUDE
 // TODO deadZone wrapping for ORIENTATION_Z?
 // TODO 'normalize' acceleration, acceleration w/ gravity and rotation rate by subtracting components of deadZone-magnitude scaled version of itself
-// TODO MOTION_POSITION that takes orientation into account; this is what gets calibrated by calibratePosition
 // TODO radius fallback when pressure is undefined on touch events?
 //		gotta test this one as my phone's native radius->pressure simulation is weak as hell
 // TODO chaining for all objects
-// TODO inconsistency with deadzone treatment and manual normalization? wtf does this mean come on man
-// TODO re-test mouse move dx/dy compatibility after browserFamily removal
-// TODO mouse move custom args
-// TODO multitouch audit/necessary fixes
+// TODO multitouch support audit/necessary fixes
 // TODO onError callback for pointer lock requests
 // TODO way to select radial when rebinding, maybe group like components and give resolveConflict callback to bind?
 
@@ -29,7 +18,7 @@ var constants = {
 	DOUBLE_PI: Math.PI * 2,
 	HALF_PI: Math.PI / 2,
 	DEGREES_TO_RADIANS: Math.PI / 180,
-	GRAVITY_VECTOR: [0, 0, 9.9 /* 9.80655, but my accelerometer sux */, 9.9]
+	GRAVITY_VECTOR: [0, 0, 9.80655, 9.80655]
 };
 
 // static privates
@@ -154,6 +143,15 @@ function addVectors(a, b, result) {
 
 function vectorMagnitude(v) {
 	return Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+}
+
+function dotProduct(a, b) { 
+	return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+}
+
+function normalizeVector(v) {
+	scaleVector(v, 1 / (vectorMagnitude(v) || 1), v);
+	v[3] = 1;
 }
 
 // events
@@ -862,37 +860,41 @@ var pi = {
 			lastReportedAccelerationIncludingGravity[1] = e.accelerationIncludingGravity.y;
 			lastReportedAccelerationIncludingGravity[2] = e.accelerationIncludingGravity.z;
 
-			// update orientation matrix for acceleration correction
+			lastReportedAcceleration[0] = e.acceleration.x;
+			lastReportedAcceleration[1] = e.acceleration.y;
+			lastReportedAcceleration[2] = e.acceleration.z;
 
-			buildZYXRotationMatrix(
-				lastReportedOrientation[0],
-				lastReportedOrientation[1],
-				lastReportedOrientation[2],
-				orientationMatrix
-			);
+			if (typeof lastReportedAcceleration[0] !== "number") {
+				// update orientation matrix for acceleration correction
 
-			multiplyMatrixByVector(orientationMatrix, constants.GRAVITY_VECTOR, gravityVector);
+				buildZYXRotationMatrix(
+					lastReportedOrientation[0],
+					lastReportedOrientation[1],
+					lastReportedOrientation[2],
+					orientationMatrix
+				);
 
-			// subtract gravity from acceleration
+				multiplyMatrixByVector(orientationMatrix, constants.GRAVITY_VECTOR, gravityVector);
 
-			subtractVectors(lastReportedAccelerationIncludingGravity, gravityVector, lastReportedAcceleration);
+				// subtract gravity from acceleration
 
-			try {
-				if (result.accelerationFilter instanceof Array) {
-					for (var i = 0; i < result.accelerationFilter.length; ++i) {
-						if (typeof result.accelerationFilter[i] === 'function') result.accelerationFilter[i](lastReportedAcceleration);
+				subtractVectors(lastReportedAccelerationIncludingGravity, gravityVector, lastReportedAcceleration);
+			}
+
+			if (result.accelerationFilter instanceof Array) {
+				for (var i = 0; i < result.accelerationFilter.length; ++i) {
+
+					if (typeof result.accelerationFilter[i] === 'function') {
+						result.accelerationFilter[i](lastReportedAcceleration);
 					}
 				}
+			}
 
-				if (result.accelerationIncludingGravityFilter instanceof Array) {
-					for (var i = 0; i < result.accelerationIncludingGravityFilter.length; ++i) {
-						if (typeof result.accelerationIncludingGravityFilter[i] === 'function') result.accelerationIncludingGravityFilter[i](lastReportedAccelerationIncludingGravity);
-					}
-				}
-			} catch (e) {
-				if (!window.dicklicks) {
-					window.dicklicks = true;
-					alert(e.toString());
+
+
+			if (result.accelerationIncludingGravityFilter instanceof Array) {
+				for (var i = 0; i < result.accelerationIncludingGravityFilter.length; ++i) {
+					if (typeof result.accelerationIncludingGravityFilter[i] === 'function') result.accelerationIncludingGravityFilter[i](lastReportedAccelerationIncludingGravity);
 				}
 			}
 
@@ -905,17 +907,28 @@ var pi = {
 			// TODO refine calibration>
 
 			subtractVectors(lastReportedAcceleration, calibration.acceleration, acceleration);
+
 			lastReportedAcceleration[0] = lastReportedAccelerationIncludingGravity[0] - gravityVector[0];
 			subtractVectors(lastReportedAccelerationIncludingGravity, calibration.accelerationIncludingGravity, accelerationIncludingGravity);
 			subtractVectors(lastReportedRotationRate, calibration.rotationRate, rotationRate);
 
-			acceleration[3] = vectorMagnitude(lastReportedAcceleration);
+			acceleration[3] = vectorMagnitude(acceleration);
 			accelerationIncludingGravity[3] = vectorMagnitude(lastReportedAccelerationIncludingGravity);
 			rotationRate[3] = vectorMagnitude(lastReportedRotationRate);
 
 			handle3DMotion(acceleration, accelerationCodes, result.accelerationDeadZone, result.accelerationThreshold, first);
 			handle3DMotion(accelerationIncludingGravity, accelerationIncludingGravityCodes, result.accelerationIncludingGravityDeadZone, result.accelerationIncludingGravityThreshold, first);
 			handle3DMotion(rotationRate, rotationRateCodes, result.rotationDeadZone, result.rotationThreshold, first);
+
+			/* TODO velocity, position
+
+			scaleVector(lastReportedAcceleration, deltaSeconds, velocityDelta);
+			addVectors(velocity, velocityDelta, velocity);
+
+			handle3DMotion(velocity, velocityCodes, result.velocityDeadZone, result.velocityThreshold, first);
+
+			*/
+
 
 			// TODO free-orientation derived velocity based on calibrated motion/orientation
 		}
@@ -1471,6 +1484,14 @@ var pi = {
 		return result;
 	},
 	Filter: {
+		Zero: function() {
+			return function(v) {
+				v[0] = 0;
+				v[1] = 0;
+				v[2] = 0;
+				v[3] = 0;
+			};
+		},
 		Ramp: function(alpha) { 
 			var old = [0, 0, 0],
 				t = alpha || (pi.motionInterval / 500),
@@ -1504,34 +1525,26 @@ var pi = {
 				result[1] = alpha * (result[1] + v[1] - old[1]);
 				result[2] = alpha * (result[2] + v[2] - old[2]);
 
-				old[0] = v[0];
-				old[1] = v[1];
-				old[2] = v[2];
-
-				v[0] = result[0];
-				v[1] = result[1];
-				v[2] = result[2];
+				copyVector(v, old);
+				copyVector(result, v);
 			};
 		},
-		Inertia: function(dampening) {
-			var old = [0, 0, 0],
-				damp = 1 - dampening,
-				d;
-
-			// this filter naively dampens the components of a vector if the
-			// sign of their delta differs from the sign of the value itself
+		Inertia: function(damping) {
+			var damp = 1 - (damping || 0.25),
+				delta = [0, 0, 0, 0],
+				oldDelta = [0, 0, 0, 0],
+				old = [0, 0, 0, 0];
 
 			return function(v) {
-				if (v[0] === null) return;
+				subtractVectors(v, old, delta);
+				normalizeVector(delta);
 
-				d = v[0] - old[0];
-				if (d < 0 !== v[0] < 0) v[0] -= d * damp;
+				var dot = Math.max(0, dotProduct(delta, oldDelta));
 
-				d = v[1] - old[1];
-				if (d < 0 !== v[1] < 0) v[1] -= d * damp;
+				
 
-				d = v[2] - old[2];
-				if (d < 0 !== v[2] < 0) v[2] -= d * damp;
+				copyVector(v, old);
+				copyVector(delta, oldDelta);
 			};
 		},
 		MovingAverage: function(length) {
@@ -1610,7 +1623,7 @@ var defaults = {
 	orientationZNormalized: false,
 
 	accelerationThreshold: 0.0,
-	accelerationDeadZone: 0.01,
+	accelerationDeadZone: 0.0,
 	accelerationFilter: false,
 
 	accelerationIncludingGravityThreshold: 0.0,
@@ -1635,8 +1648,8 @@ var defaults = {
 function initMotionDefaults(e) {
 	pi.motionInterval = e.interval;
 
-	defaults.accelerationFilter = [new pi.Filter.AdaptiveHighPass()];
-	//defaults.accelerationIncludingGravityFilter = [new pi.Filter.AdaptiveHighPass()];
+	//defaults.accelerationFilter = [];
+	defaults.accelerationIncludingGravityFilter = [new pi.Filter.Zero()];
 	//defaults.rotationFilter = new pi.Filter.MovingAverage();
 	//defaults.velocityFilter = [new pi.Filter.MovingAverage(), new pi.Filter.MovingAverage()];
 	//defaults.positionFilter = new pi.Filter.MovingAverage();

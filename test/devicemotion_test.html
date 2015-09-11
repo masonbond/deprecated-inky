@@ -21,17 +21,43 @@ body {
 	width: 100%;
 	min-height: 8em;
 }
+
+canvas {
+	margin-top: 2em;
+	width: 900px;
+	height: 1400px;
+	background: white;
+}
+
 </style>
 <script src="../src/utils.js"></script>
 <script src="../src/inky.js"></script>
 </head>
 <body>
+<canvas id="canvas0"/>
 <div id="test0" class="test"></div>
 <div id="test1" class="test"></div>
 <div id="test2" class="test"></div>
 <div id="test3" class="test"></div>
 
 <script>
+
+var raisedErrors = {};
+
+window.onerror = function(msg, url, line, col, err) {
+	var concat = err.toString() + '\n' + err.stack;
+
+	alertOnce(concat);
+}
+
+function alertOnce(msg) {
+	if (raisedErrors[msg]) return;
+	raisedErrors[msg] = true;
+	alert(msg);
+}
+
+var canvas = document.getElementById('canvas0'),
+	context = canvas.getContext('2d');
 
 var test0 = document.getElementById('test0'),
 	test1 = document.getElementById('test1'),
@@ -45,6 +71,8 @@ var testElements = {
 	'Velocity': test3
 };
 
+var xValues = [];
+
 function moveDump(e) {
 	var componentSplit = e.component.split(' '),
 		axis = componentSplit.pop(),
@@ -53,6 +81,7 @@ function moveDump(e) {
 	switch (axis) {
 		case 'X':
 			e.target.x = e.move.v;
+			if (type === 'Gravity') xValues.push(e.move.v);
 			break;
 		case 'Y':
 			e.target.y = e.move.v;
@@ -68,16 +97,19 @@ function moveDump(e) {
 	testElements[type].innerHTML = type + ": " + JSON.stringify(e.target, null, 4);
 }
 
-var motionDispatcher = new IN.Dispatcher();
+var motionDispatcher = new IN.Dispatcher({
+	accelerationFilter: [new IN.Filter.MovingAverage(21)]
+});
 
 var motionControl = new IN.Control({
 	move: moveDump
 });
 
-var gravityBinding = motionDispatcher.bind({
+var gravity = { x: 0, y: 0, z: 0, m: 0 },
+	gravityBinding = motionDispatcher.bind({
 	control: motionControl,
 	component: [IN.MOTION_ACCELERATION_WITH_GRAVITY_X, IN.MOTION_ACCELERATION_WITH_GRAVITY_Y, IN.MOTION_ACCELERATION_WITH_GRAVITY_Z, IN.MOTION_ACCELERATION_WITH_GRAVITY_MAGNITUDE],
-	target: { x: 0, y: 0, z: 0, m: 0 }
+	target: gravity
 });
 
 var orientationBinding = motionDispatcher.bind({
@@ -91,6 +123,42 @@ var accelerationBinding = motionDispatcher.bind({
 	component: [IN.MOTION_ACCELERATION_X, IN.MOTION_ACCELERATION_Y, IN.MOTION_ACCELERATION_Z, IN.MOTION_ACCELERATION_MAGNITUDE],
 	target: { x: 0, y: 0, z: 0, m: 0 }
 });//*/
+
+var velocityBinding = motionDispatcher.bind({
+	control: motionControl,
+	component: [IN.MOTION_VELOCITY_X, IN.MOTION_VELOCITY_Y, IN.MOTION_VELOCITY_Z, IN.MOTION_VELOCITY_MAGNITUDE],
+	target: { x: 0, y: 0, z: 0, m: 0 }
+});//*/
+
+var first = true;
+
+setInterval(function() {
+	var l = xValues.length ,
+		w = canvas.width - l,
+		h = canvas.height,
+		hc = Math.floor(h / 2),
+		a;
+
+	context.drawImage(canvas, l, 0, w, h, 0, 0, w, h);
+
+	w += 0.5;
+	h += 0.5;
+
+	while (xValues.length) {
+		a = Math.floor(xValues.shift() * hc / 2) + .5;
+		context.strokeStyle = "gold";
+		context.strokeRect(w, 0, w, h);
+
+		if (a > 0) {
+			context.strokeStyle = "black";
+			context.strokeRect(w, hc - a, w+1, a);	
+		} else {
+			context.strokeStyle = "red";
+			context.strokeRect(w, hc, w+1, -a);	
+		}
+		w += 1;
+	}
+}, 100);
 
 </script>
 </body>
