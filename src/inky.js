@@ -1,13 +1,13 @@
 ;var IN = (function() {"use strict";
 
-// TODO don't give up on velocity, position
 // TODO address component code->xyz pain point in controller; maybe create premade move arguments that filter based on name and autopop x, y, z??
-// TODO MOTION_ORIENTATION_MAGNITUDE
-// NEW	deadZone wrapping for ORIENTATION_Z?
 // TODO 'normalize' acceleration, acceleration w/ gravity and rotation rate by subtracting components of deadZone-magnitude scaled version of itself
-// NEW	radius components, fallback when pressure is undefined on touch events? gotta test this one as my phone's native radius->pressure simulation is weak as hell
 // TODO multitouch support audit/necessary fixes
 // TODO way to select radial when rebinding, maybe group like components and give resolveConflict callback to bind?
+
+// NEW	don't give up on velocity, position
+// NEW	deadZone wrapping for ORIENTATION_Z?
+// NEW	touch radius components, fallback when pressure is undefined on touch events? gotta test this one as my phone's native radius->pressure simulation is weak as hell
 
 // helpful constants
 var constants = {
