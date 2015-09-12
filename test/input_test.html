@@ -199,10 +199,10 @@ var binding2 = input2.bind({
 console.log("binding2", binding2, c);
 
 testElement.addEventListener("click", function(e) {
-	input.requestPointerLock(function(e) {
+	input2.requestPointerLock(function(e) {
 		console.log("entering pointurd lock");
 		setTimeout(function(){
-			input.exitPointerLock(function(e) {
+			input2.exitPointerLock(function(e) {
 				console.log("exiting pointer lock - this callback set at time of exit request");
 			});
 		}, 5000);
