@@ -32,57 +32,6 @@ function identityMatrix() {
 	];
 }
 
-function buildXRotationMatrix(x, result) {
-	var cx = Math.cos(x),
-		sx = Math.sin(x);
-
-	result[0] = 1;
-	result[1] = 0;
-	result[2] = 0;
-
-	result[4] = 0;
-	result[5] = cx;
-	result[6] = sx;
-
-	result[8] = 0;
-	result[9] = -sx;
-	result[10] = cx;
-}
-
-function buildYRotationMatrix(x, result) {
-	var cx = Math.cos(x),
-		sx = Math.sin(x);
-
-	result[0] = cx;
-	result[1] = 0;
-	result[2] = -sx;
-
-	result[4] = 0;
-	result[5] = 1;
-	result[6] = 0;
-
-	result[8] = sx;
-	result[9] = 0;
-	result[10] = cx;
-}
-
-function buildZRotationMatrix(x, result) {
-	var cx = Math.cos(x),
-		sx = Math.sin(x);
-
-	result[0] = cx;
-	result[1] = sx;
-	result[2] = 0;
-
-	result[4] = -sx;
-	result[5] = cx;
-	result[6] = 0;
-
-	result[8] = 0;
-	result[9] = 0;
-	result[10] = 1;
-}
-
 function buildZYXRotationMatrix(x, y, z, result) {
 	var cx = Math.cos(x),
 		sx = Math.sin(x),
@@ -138,15 +87,6 @@ function addVectors(a, b, result) {
 
 function vectorMagnitude(v) {
 	return Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
-}
-
-function dotProduct(a, b) { 
-	return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-}
-
-function normalizeVector(v) {
-	scaleVector(v, 1 / (vectorMagnitude(v) || 1), v);
-	v[3] = 1;
 }
 
 // events
@@ -361,7 +301,7 @@ var dispatchers = [];
 
 // create public interface
 var pi = {
-	version: "0.8",
+	version: "0.9",
 	async: {},
 	support: {
 		devicemotion: 'devicemotion' in window,
@@ -808,8 +748,6 @@ var pi = {
 		var lastReportedRotationRate = [0, 0, 0, 0];
 
 		window.addEventListener('devicemotion', motionInit);
-
-		// TODO can actually factor this cleanly
 
 		function motionInit(e) {
 			motionInterval = e.interval || 0;
@@ -1529,24 +1467,6 @@ var pi = {
 
 				copyVector(v, old);
 				copyVector(result, v);
-			};
-		},
-		Inertia: function(damping) {
-			var damp = 1 - (damping || 0.25),
-				delta = [0, 0, 0, 0],
-				oldDelta = [0, 0, 0, 0],
-				old = [0, 0, 0, 0];
-
-			return function(v) {
-				subtractVectors(v, old, delta);
-				normalizeVector(delta);
-
-				var dot = Math.max(0, dotProduct(delta, oldDelta));
-
-				
-
-				copyVector(v, old);
-				copyVector(delta, oldDelta);
 			};
 		},
 		MovingAverage: function(length) {
